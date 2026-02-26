@@ -1,0 +1,900 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Icon } from '@iconify/react';
+import { ArrowLeftRight, Minus } from 'lucide-react';
+import backgroundComponents from './Backgrounds';
+import animationComponents from './Animations';
+import PremiumDropdown from './PremiumDropdown';
+import {
+  DraggableSpan, 
+  solidPalette,
+  hexToRgb,
+  generateGradientString,
+  getColorAtOffset,
+  CustomColorPicker
+} from './AppearanceShared';
+const BackgroundSection = ({ 
+  backgroundSettings, 
+  onUpdateBackground 
+}) => {
+  const [activeTab, setActiveTab] = useState('Background');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
+  const [showGallery, setShowGallery] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [selectedTheme, setSelectedTheme] = useState(null);
+  const [localGallerySelected, setLocalGallerySelected] = useState(null);
+
+  useEffect(() => {
+     if (backgroundSettings?.style === 'ReactBits' && backgroundSettings.reactBitType) {
+         setSelectedTheme(backgroundSettings.reactBitType);
+     } else {
+         setSelectedTheme(null);
+     }
+  }, [backgroundSettings.style, backgroundSettings.reactBitType]);
+
+  useEffect(() => {
+    if (!selectedTheme) return;
+    
+    // Guard: Only update if the style or theme type is actually different
+    if (backgroundSettings?.style === 'ReactBits' && backgroundSettings?.reactBitType === selectedTheme) return;
+
+    const updates = { 
+         ...backgroundSettings, 
+         style: 'ReactBits', 
+         reactBitType: selectedTheme,
+         color: '#000000'
+    };
+
+    // Store the original color if we're switching FROM Solid style
+    if (backgroundSettings.style === 'Solid') {
+       updates.savedSolidColor = backgroundSettings.color;
+    }
+
+    onUpdateBackground(updates);
+  }, [selectedTheme, backgroundSettings.style, backgroundSettings.reactBitType]);
+
+  const [editingGradientStopIndex, setEditingGradientStopIndex] = useState(null);
+  const [pendingNewStopOffset, setPendingNewStopOffset] = useState(null);
+
+  const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  
+  // Load gallery images from localStorage on mount
+  useEffect(() => {
+    const savedImages = localStorage.getItem('customized_editor_gallery');
+    if (savedImages) {
+      try {
+        setUploadedImages(JSON.parse(savedImages));
+      } catch (e) {
+        console.error("Failed to load gallery images", e);
+      }
+    }
+  }, []);
+
+  // Save gallery images to localStorage when updated
+  useEffect(() => {
+    if (uploadedImages.length > 0) {
+      localStorage.setItem('customized_editor_gallery', JSON.stringify(uploadedImages));
+    }
+  }, [uploadedImages]);
+
+  const bgStyle = (backgroundSettings?.style === 'ReactBits' || !backgroundSettings?.style) ? 'Solid' : backgroundSettings.style;
+
+  useEffect(() => {
+    if (bgStyle === 'Gradient' && backgroundSettings.gradientStops && !backgroundSettings.gradient) {
+      const gradient = generateGradientString(
+        backgroundSettings.gradientType || 'Linear', 
+        backgroundSettings.gradientStops,
+        backgroundSettings.gradientAngle || 0,
+        backgroundSettings.gradientRadius || 100
+      );
+      onUpdateBackground({ ...backgroundSettings, gradient });
+    }
+  }, [bgStyle, backgroundSettings.gradientStops, backgroundSettings.gradient, onUpdateBackground]);
+
+  useEffect(() => {
+    if (bgStyle === 'Gradient' && !backgroundSettings.gradientStops) {
+      const stops = [
+        { color: '#63D0CD', offset: 0, opacity: 100 },
+        { color: '#4B3EFE', offset: 100, opacity: 100 }
+      ];
+      onUpdateBackground({
+        ...backgroundSettings,
+        gradientType: 'Linear',
+        gradientStops: stops,
+        gradientRadius: 100,
+        gradientAngle: 0,
+        gradient: generateGradientString('Linear', stops, 0, 100)
+      });
+    }
+  }, [bgStyle, backgroundSettings.gradientStops, onUpdateBackground]);
+
+  useEffect(() => {
+    if (pendingNewStopOffset !== null && backgroundSettings.gradientStops) {
+      const index = backgroundSettings.gradientStops.findIndex(s => s.offset === pendingNewStopOffset);
+      if (index !== -1) {
+        openGradientStopPicker(index);
+        setPendingNewStopOffset(null);
+      }
+    }
+  }, [backgroundSettings.gradientStops, pendingNewStopOffset]);
+
+  const updateGradientStop = (index, updates) => {
+    const newStops = [...(backgroundSettings.gradientStops || [])];
+    newStops[index] = { ...newStops[index], ...updates };
+    const gradient = generateGradientString(
+      backgroundSettings.gradientType || 'Linear', 
+      newStops,
+      backgroundSettings.gradientAngle || 0,
+      backgroundSettings.gradientRadius || 100
+    );
+    onUpdateBackground({ ...backgroundSettings, gradientStops: newStops, gradient });
+  };
+
+  const removeGradientStop = (index) => {
+    if (backgroundSettings.gradientStops.length <= 2) return;
+    const newStops = backgroundSettings.gradientStops.filter((_, i) => i !== index);
+    const gradient = generateGradientString(
+      backgroundSettings.gradientType || 'Linear', 
+      newStops,
+      backgroundSettings.gradientAngle || 0,
+      backgroundSettings.gradientRadius || 100
+    );
+    onUpdateBackground({ ...backgroundSettings, gradientStops: newStops, gradient });
+  };
+
+  const addGradientStop = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const offset = Math.min(100, Math.max(0, Math.round((x / rect.width) * 100)));
+    const color = getColorAtOffset(offset, backgroundSettings.gradientStops || []);
+    const newStop = { color: color, offset, opacity: 100 };
+    const newStops = [...(backgroundSettings.gradientStops || []), newStop].sort((a, b) => a.offset - b.offset);
+    const gradient = generateGradientString(
+      backgroundSettings.gradientType || 'Linear', 
+      newStops,
+      backgroundSettings.gradientAngle || 0,
+      backgroundSettings.gradientRadius || 100
+    );
+    
+    setPickerPos({ x: e.clientX - 100, y: rect.top - 100 });
+    setPendingNewStopOffset(offset);
+    
+    onUpdateBackground({ ...backgroundSettings, gradientStops: newStops, gradient });
+  };
+
+  const reverseGradient = () => {
+    const newStops = [...(backgroundSettings.gradientStops || [])].map(s => ({ ...s, offset: 100 - s.offset })).sort((a, b) => a.offset - b.offset);
+    const gradient = generateGradientString(
+      backgroundSettings.gradientType || 'Linear', 
+      newStops,
+      backgroundSettings.gradientAngle || 0,
+      backgroundSettings.gradientRadius || 100
+    );
+    onUpdateBackground({ ...backgroundSettings, gradientStops: newStops, gradient });
+  };
+
+  const resetGradient = () => {
+    const newStops = [
+      { color: '#63D0CD', offset: 0, opacity: 100 },
+      { color: '#4B3EFE', offset: 100, opacity: 100 }
+    ];
+    const gradient = generateGradientString('Linear', newStops, 0, 100);
+    onUpdateBackground({
+      ...backgroundSettings,
+      gradientType: 'Linear',
+      gradientStops: newStops,
+      gradientAngle: 0,
+      gradientRadius: 100,
+      gradient
+    });
+  };
+
+  const openGradientStopPicker = (index) => {
+    setEditingGradientStopIndex(index);
+  };
+
+  const handleModalFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const newImageData = { id: Date.now(), url: event.target.result };
+      setUploadedImages((prev) => [newImageData, ...prev]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const setBgStyle = (style) => {
+    setSelectedTheme(null);
+    if (style === 'Gradient' && backgroundSettings.gradientStops) {
+      const gradient = generateGradientString(
+        backgroundSettings.gradientType || 'Linear', 
+        backgroundSettings.gradientStops,
+        backgroundSettings.gradientAngle || 0,
+        backgroundSettings.gradientRadius || 100
+      );
+      onUpdateBackground({ ...backgroundSettings, style, gradient, reactBitType: null });
+    } else if (style === 'Solid' && backgroundSettings.savedSolidColor) {
+      onUpdateBackground({ ...backgroundSettings, style, color: backgroundSettings.savedSolidColor, reactBitType: null });
+    } else {
+      onUpdateBackground({ ...backgroundSettings, style, reactBitType: null });
+    }
+  };
+
+  const handleColorSelect = (color) => {
+    setSelectedTheme(null);
+    onUpdateBackground({ ...backgroundSettings, style: 'Solid', color });
+  };
+
+  return (
+    <div className="p-[1vw] flex flex-col">
+      {/* Tabs */}
+      <div className="flex items-center gap-[0.55vw] mb-[1.5vw]">
+        {['Background', 'Themes', 'Animations'].map((tab) => (
+          <button 
+            key={tab}
+            onClick={() => setActiveTab(tab)} 
+            className={`px-[1.1vw] py-[0.50vw] text-[0.80vw] font-semibold rounded-[0.75vw] transition-all active:scale-95 border border-transparent ${
+              activeTab === tab 
+                ? 'text-black bg-white shadow-[inset_0.2vw_0.2vw_0.4vw_rgba(0,0,0,0.08),inset_-0.2vw_-0.2vw_0.4vw_rgba(255,255,255,0.9)] border-gray-500/20' 
+                : 'text-gray-400 bg-white shadow-[0.2vw_0.2vw_0.5vw_rgba(0,0,0,0.05),-0.1vw_-0.1vw_0.3vw_rgba(255,255,255,1)] hover:shadow-[0.3vw_0.3vw_0.7vw_rgba(0,0,0,0.08)]'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'Background' && (
+        <>
+          <div className="flex items-center gap-[3.5vw] mb-[0.5vw]">
+            <PremiumDropdown 
+              options={['Solid', 'Gradient', 'Image']}
+              value={bgStyle}
+              onChange={(style) => setBgStyle(style)}
+              width="7vw"
+              align="right"
+            />
+
+            {bgStyle === 'Gradient' && (
+              <PremiumDropdown 
+                options={['Linear', 'Radial', 'Angular', 'Diamond']}
+                value={backgroundSettings.gradientType || 'Linear'}
+                onChange={(type) => {
+                  const newAngle = type === 'Radial' ? 0 : (backgroundSettings.gradientAngle || 0);
+                  const gradient = generateGradientString(
+                    type, 
+                    backgroundSettings.gradientStops || [],
+                    newAngle,
+                    backgroundSettings.gradientRadius || 100
+                  );
+                  onUpdateBackground({ 
+                    ...backgroundSettings, 
+                    gradientType: type, 
+                    gradientAngle: newAngle,
+                    gradient 
+                  });
+                }}
+                width="8vw"
+                align="right"
+              />
+            )}
+
+            {bgStyle === 'Image' && (
+              <PremiumDropdown 
+                options={['Fit', 'Fill', 'Stretch']}
+                value={backgroundSettings.fit}
+                onChange={(fill) => onUpdateBackground({ ...backgroundSettings, fit: fill })}
+                width="8vw"
+                align="right"
+              />
+            )}
+          </div>
+
+          {bgStyle === 'Solid' ? (
+            <>
+              <div className="mb-[2vw]">
+                <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw]">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Pick Colors From Pallet</span>
+                  <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
+                </div>
+                
+                <div className="flex items-center justify-between gap-[1vw]">
+                  <span className="text-[0.75vw] font-semibold text-gray-700">Fill :</span>
+                  <div className="flex-1 flex gap-[0.5vw] items-center color-picker-trigger">
+                    <div 
+                      className="w-[2vw] h-[1.75vw] rounded-[0.275vw] border-gray-200 shadow-inner cursor-pointer hover:border-indigo-400 transition-colors" 
+                      style={{ backgroundColor: (backgroundSettings.style === 'ReactBits' && backgroundSettings.savedSolidColor) ? backgroundSettings.savedSolidColor : backgroundSettings.color }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setPickerPos({ x: rect.left - 100, y: rect.top - 100 });
+                        setShowColorPicker(true);
+                      }}
+                    />
+                    <div className="flex-1 h-[2.25vw] border border-gray-100/50 rounded-[0.75vw] flex items-center px-[0.75vw] justify-between bg-white shadow-[inset_0.15vw_0.15vw_0.4vw_rgba(0,0,0,0.04)]">
+                      <span className="text-[0.8vw] font-semibold text-gray-400">{(backgroundSettings.style === 'ReactBits' && backgroundSettings.savedSolidColor) ? backgroundSettings.savedSolidColor : backgroundSettings.color}</span>
+                      <span className="text-[0.8vw] font-semibold text-gray-400">100%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-[1.5vw]">
+                <div className="flex items-center gap-[1vw] mb-[1.25vw]">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Solid Colors</span>
+                  <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
+                </div>
+                
+                <div className="grid grid-cols-6 gap-[0.625vw] px-[0.25vw]">
+                  {solidPalette.map((color, i) => (
+                    <button 
+                      key={i}
+                      onClick={() => handleColorSelect(color)}
+                      className={`aspect-square rounded-[0.5vw] border shadow-sm transition-all hover:scale-110 ${backgroundSettings.color.toLowerCase() === color.toLowerCase() ? 'border-[#3E4491] border-[0.125vw] ring-[0.125vw] ring-indigo-100 scale-105' : 'border-gray-200 hover:border-gray-300'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : bgStyle === 'Gradient' ? (
+            <div className="space-y-[1.5vw] pt-[1vw]">
+              <div>
+                <div className="flex items-center gap-[0.75vw] mb-[2vw]">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Customize your Color</span>
+                  <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
+                  <div className="flex gap-[0.5vw]">
+                    <button onClick={resetGradient} className="w-[2.25vw] h-[2.25vw] flex items-center justify-center bg-white border border-gray-100 rounded-[0.5vw] shadow-[0_0.2vw_0.4vw_rgba(0,0,0,0.08)] hover:bg-gray-50 transition-colors" title="Reset Gradient">
+                      <Icon icon="ix:reset" className="w-[1.2vw] h-[1.2vw] text-gray-600" />
+                    </button>
+                    <button onClick={reverseGradient} className="w-[2.25vw] h-[2.25vw] flex items-center justify-center bg-white border border-gray-100 rounded-[0.5vw] shadow-[0_0.2vw_0.4vw_rgba(0,0,0,0.08)] hover:bg-gray-50 transition-colors" title="Swap Directions">
+                      <ArrowLeftRight size="1.2vw" className="text-gray-600" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-[0.75vw] mb-[1.5vw]">
+                  {(() => {
+                    const gType = backgroundSettings.gradientType || 'Linear';
+                    const gStops = backgroundSettings.gradientStops || [];
+                    const gAngle = backgroundSettings.gradientAngle || 0;
+                    const stopsStr = [...gStops].sort((a,b)=>a.offset-b.offset).map(s => {
+                      const rgb = hexToRgb(s.color);
+                      const op = (s.opacity || 100) / 100;
+                      return `rgba(${rgb.r},${rgb.g},${rgb.b},${op}) ${s.offset}%`;
+                    }).join(', ');
+
+                    let previewBg = '';
+                    let previewStyle = {};
+
+                    if (gType === 'Angular') {
+                      previewBg = generateGradientString('Angular', gStops, gAngle, backgroundSettings.gradientRadius || 100);
+                      previewStyle = { background: previewBg, borderRadius: '0.4vw' };
+                    } else if (gType === 'Diamond') {
+                      previewBg = generateGradientString('Diamond', gStops, gAngle, backgroundSettings.gradientRadius || 100);
+                      previewStyle = { background: previewBg, borderRadius: '0.4vw' };
+                    } else if (gType === 'Radial') {
+                      previewBg = generateGradientString('Radial', gStops, gAngle, backgroundSettings.gradientRadius || 100);
+                      previewStyle = { background: previewBg, borderRadius: '50%' };
+                    } else {
+                      previewBg = `linear-gradient(${gAngle}deg, ${stopsStr})`;
+                      previewStyle = { background: previewBg, borderRadius: '0.4vw' };
+                    }
+
+                    return (
+                      <div className="flex items-center gap-[1vw]">
+                        <div className="relative flex-shrink-0 shadow-md border border-gray-100" style={{ width: '4vw', height: '4vw', ...previewStyle }} />
+                        <div className="flex-1 flex flex-col gap-[0.375vw]">
+                          <span className="text-[0.625vw] font-semibold text-gray-500 uppercase tracking-wide">{gType} Gradient</span>
+                          {(gType === 'Linear' || gType === 'Angular') && (
+                            <div className="flex items-center gap-[0.5vw]">
+                              <span className="text-[0.75vw] font-semibold text-gray-700">Angle</span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="360"
+                                value={backgroundSettings.gradientAngle || 0}
+                                onChange={(e) => {
+                                  const a = parseInt(e.target.value);
+                                  const gradient = generateGradientString(gType, gStops, a, backgroundSettings.gradientRadius || 100);
+                                  onUpdateBackground({ ...backgroundSettings, gradientAngle: a, gradient });
+                                }}
+                                className="flex-1 h-[0.3vw] rounded-full  cursor-pointer"
+                                style={{ accentColor: '#3b3c8aff' }}
+                              />
+                              <span className="text-[0.6vw] font-semibold text-gray-600 w-[2vw] text-right">{backgroundSettings.gradientAngle || 0}°</span>
+                            </div>
+                          )}
+                          {(gType === 'Radial' || gType === 'Diamond') && (
+                            <div className="flex items-center gap-[0.5vw]">
+                              <span className="text-[0.75vw] font-semibold text-gray-700">Radius</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="200"
+                                value={backgroundSettings.gradientRadius || 100}
+                                onChange={(e) => {
+                                  const r = parseInt(e.target.value);
+                                  const gradient = generateGradientString(gType, gStops, gAngle, r);
+                                  onUpdateBackground({ ...backgroundSettings, gradientRadius: r, gradient });
+                                }}
+                                className="flex-1 h-[0.3vw] rounded-full cursor-pointer"
+                                style={{ accentColor: '#3b3c8aff' }}
+                              />
+                              <span className="text-[0.6vw] font-semibold text-gray-600 w-[2vw] text-right">{backgroundSettings.gradientRadius || 100}%</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="relative pt-[1.5vw] pb-[0.5vw] px-[0.25vw]">
+                    <div className="absolute top-0 left-0 w-full h-[2vw] flex items-center pointer-events-none px-[0.25vw]">
+                      {(backgroundSettings.gradientStops || []).map((stop, idx) => (
+                        <div
+                          key={idx}
+                          className="absolute -translate-x-1/2 flex flex-col items-center group pointer-events-auto cursor-grab active:cursor-grabbing"
+                          style={{ left: `${stop.offset}%`, bottom: '0.5vw' }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            const startX = e.clientX;
+                            const startOffset = stop.offset;
+                            let hasDragged = false;
+                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            const handleMouseMove = (moveEvent) => {
+                              const deltaX = moveEvent.clientX - startX;
+                              if (Math.abs(deltaX) > 3) {
+                                hasDragged = true;
+                                const deltaPercent = (deltaX / rect.width) * 100;
+                                const newOffset = Math.min(100, Math.max(0, startOffset + deltaPercent));
+                                updateGradientStop(idx, { offset: Math.round(newOffset) });
+                              }
+                            };
+                            const handleMouseUp = () => {
+                              window.removeEventListener('mousemove', handleMouseMove);
+                              window.removeEventListener('mouseup', handleMouseUp);
+                              if (!hasDragged) {
+                                const pickRect = e.currentTarget.getBoundingClientRect();
+                                setPickerPos({ x: pickRect.left - 100, y: pickRect.top - 100 });
+                                openGradientStopPicker(idx);
+                              }
+                            };
+                            window.addEventListener('mousemove', handleMouseMove);
+                            window.addEventListener('mouseup', handleMouseUp);
+                          }}
+                        >
+                          <div
+                            className="border-2 border-white shadow-md relative hover:scale-110 transition-transform"
+                            style={{
+                              width: '1.5vw', height: '1.5vw',
+                              backgroundColor: stop.color,
+                              borderRadius: (backgroundSettings.gradientType === 'Diamond') ? '0.15vw' : '0.4vw'
+                            }}
+                          >
+                             <div className="absolute top-[100%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[0.3vw] border-l-transparent border-r-[0.3vw] border-r-transparent border-t-[0.4vw] border-t-white"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div
+                      className="w-full h-[1.5vw] rounded-[0.4vw] shadow-inner border border-gray-100 cursor-copy"
+                      onClick={addGradientStop}
+                      style={{
+                        background: `linear-gradient(to right, ${(backgroundSettings.gradientStops || []).map(s => {
+                          const rgb = hexToRgb(s.color);
+                          const opacity = (s.opacity || 100) / 100;
+                          return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity}) ${s.offset}%`;
+                        }).join(', ')})`
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="space-y-[0.75vw]">
+                  {(backgroundSettings.gradientStops || []).map((stop, idx) => (
+                    <div key={idx} className="flex items-center gap-[0.75vw]">
+                      <div 
+                        className="w-[2.25vw] h-[2.25vw] rounded-[0.5vw] border border-gray-200 shadow-sm cursor-pointer hover:border-indigo-400 transition-colors" 
+                        style={{ backgroundColor: stop.color }}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPickerPos({ x: rect.left - 240, y: rect.top - 100 });
+                          openGradientStopPicker(idx);
+                        }}
+                      />
+                      <div className="flex-1 h-[2.25vw] border border-gray-600 rounded-[0.5vw] flex items-center px-[0.75vw] justify-between bg-white">
+                        <span className="text-[0.85vw] font-medium text-gray-700 font-mono">{stop.color.toUpperCase()}</span>
+                        <span className="text-[0.85vw] font-medium text-gray-700">{stop.opacity || 100}%</span>
+                      </div>
+                      <button onClick={() => removeGradientStop(idx)} className="w-[2.25vw] h-[2.25vw] flex items-center justify-center border border-red-500 rounded-[0.5vw] text-red-500 hover:bg-red-50 transition-colors">
+                        <Minus size="1.2vw" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-[1vw] mb-[1.5vw]">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Gradient Colors</span>
+                  <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
+                </div>
+                <div className="grid grid-cols-6 gap-[0.625vw] px-[0.25vw]">
+                  {[
+                    ['#FF5F6D', '#FFC371'], ['#6366F1', '#A855F7'], ['#84CC16', '#4ADE80'], 
+                    ['#FDE047', '#FEF08A'], ['#EC4899', '#F472B6'], ['#A5B4FC', '#E0E7FF'],
+                    ['#06B6D4', '#67E8F9'],['#FF416C', '#FF4B2B'],  ['#FDBB2D', '#22C1C3']
+                  ].map((colors, i) => (
+                    <button 
+                      key={i}
+                      onClick={() => {
+                        const newStops = [
+                          { color: colors[0], offset: 0, opacity: 100 },
+                          { color: colors[1], offset: 100, opacity: 100 }
+                        ];
+                        const gradient = generateGradientString(
+                          backgroundSettings.gradientType || 'Linear', 
+                          newStops,
+                          backgroundSettings.gradientAngle || 0,
+                          backgroundSettings.gradientRadius || 100
+                        );
+                        onUpdateBackground({ ...backgroundSettings, gradientStops: newStops, gradient });
+                      }}
+                      className="aspect-square rounded-[0.5vw] border border-gray-200 shadow-sm transition-all hover:scale-110"
+                      style={{ background: `linear-gradient(to bottom right, ${colors[0]}, ${colors[1]})` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-[2vw]">
+                <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw] pb-[1vw]">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Upload Image</span>
+                  <div className="h-[1px] flex-grow bg-gray-100 mt-[0.2vw]"></div>
+                </div>
+                
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => onUpdateBackground({ ...backgroundSettings, image: event.target.result });
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+
+                {backgroundSettings.image ? (
+                  <div className="flex items-center justify-between gap-2 px-1 pb-6">
+                    <div className="relative w-[85px] h-[55px] rounded-lg overflow-hidden border border-gray-200 group">
+                      <img src={backgroundSettings.image} alt="Thumbnail" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => onUpdateBackground({ ...backgroundSettings, image: null })}>
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                      </div>
+                    </div>
+                     <div onClick={() => fileInputRef.current?.click()} className="flex-1 h-[55px] border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 transition-all">
+                        <Icon icon="lucide:upload" className="w-4 h-4 text-gray-400 mb-0.5" />
+                        <p className="text-[9px] font-semibold text-gray-500">Upload replacement</p>
+                      </div>
+                  </div>
+                ) : (
+                  <div onClick={() => fileInputRef.current?.click()} className="w-full h-24 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-500 transition-all group">
+                    <Icon icon="lucide:upload" className="w-6 h-6 text-gray-400" />
+                    <p className="text-xs font-semibold text-gray-500">Click to upload background</p>
+                  </div>
+                )}
+
+                <button 
+                              onClick={() => setShowGallery(true)}
+                              className="relative w-full h-[3.5vw] bg-black rounded-[0.5vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
+                            >
+                              {/* Background Images Overlay */}
+                              <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
+                                <div className="flex-1 bg-cover bg-center" 
+                                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1493612276216-ee3925520721?q=80&w=300&auto=format&fit=crop')" }}>
+                                </div>
+                                <div className="flex-1 bg-cover bg-center" 
+                                 style={{ backgroundImage: "url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=300&auto=format&fit=crop')" }}>
+                                </div>
+                                <div className="flex-1 bg-cover bg-center" 
+                                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=300&auto=format&fit=crop')" }}>
+                                </div>
+                              </div>
+                              {/* Dark Gradient Overlay */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
+                              
+                              {/* Content */}
+                              <div className="relative z-10 flex items-center gap-[0.75vw]">
+                                  <Icon icon="lucide:images" className="w-[1.2vw] h-[1.2vw] text-white" />
+                                <span className="text-[0.85vw] font-bold text-white tracking-wide">Image Gallery</span>
+                              </div>
+                            </button>
+              </div>
+
+              {backgroundSettings.image && (
+                <div className="space-y-[1.25vw] pt-[1.5vw]">
+                  <div className="flex items-center justify-between">
+                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
+                  <div className="h-[1px] flex-grow bg-gray-200 ml-[1vw] mt-[0.2vw]"></div>
+                  </div>
+                  <div className="flex items-center gap-[0.75vw]">
+                    <input 
+                      type="range" 
+                      min="0" max="100" 
+                      value={backgroundSettings.opacity} 
+                      onChange={(e) => onUpdateBackground({ ...backgroundSettings, opacity: parseInt(e.target.value) })}
+                      className="flex-1 h-[0.35vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
+                      style={{ 
+                        background: `linear-gradient(to right, #5551FF 0%, #5551FF ${backgroundSettings.opacity}%, #f3f4f6 ${backgroundSettings.opacity}%, #f3f4f6 100%)` 
+                      }}
+                    />
+                    <div 
+                      className="w-[3.5vw] h-[2.2vw] border border-gray-100 rounded-[0.5vw] flex items-center justify-center bg-white cursor-ew-resize select-none text-[0.8vw] text-gray-800 font-semibold shadow-sm"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const startX = e.clientX;
+                        const startVal = backgroundSettings.opacity;
+                        const handleMove = (moveEvent) => {
+                          const dx = moveEvent.clientX - startX;
+                          const newVal = Math.max(0, Math.min(100, startVal + Math.round(dx)));
+                          onUpdateBackground({ ...backgroundSettings, opacity: newVal });
+                        };
+                        const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
+                        window.addEventListener('mousemove', handleMove);
+                        window.addEventListener('mouseup', handleUp);
+                      }}
+                    >
+                      {backgroundSettings.opacity}%
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {backgroundSettings.image && (
+                <div className="space-y-[1.5vw] pt-[1.5vw]">
+                  <div className="flex items-center">
+                    <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Adjustments</span>
+                    <div className="h-[1px] flex-grow bg-gray-200 ml-[1vw] mt-[0.2vw]"></div>
+                  </div>
+
+                  <div className="space-y-[0.1vw]">
+                    {[
+                      { label: 'Exposure', key: 'exposure', min: -100, max: 100 },
+                      { label: 'Contrast', key: 'contrast', min: -100, max: 100 },
+                      { label: 'Saturation', key: 'saturation', min: -100, max: 100 },
+                      { label: 'Temperature', key: 'temperature', min: -100, max: 100 },
+                      { label: 'Tint', key: 'tint', min: -180, max: 180 },
+                      { label: 'Highlights', key: 'highlights', min: -100, max: 100 },
+                      { label: 'Shadows', key: 'shadows', min: -100, max: 100 },
+                    ].map((adj) => {
+                      const val = backgroundSettings.adjustments?.[adj.key] || 0;
+                      const percentage = ((val - adj.min) / (adj.max - adj.min)) * 100;
+                      return (
+                        <div key={adj.key}>
+                          {/* Label + Reset + Value */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-[0.2vw]">
+                              <DraggableSpan 
+                                label={adj.label} 
+                                value={val} 
+                                onChange={(v) => {
+                                  onUpdateBackground({
+                                    ...backgroundSettings,
+                                    adjustments: {
+                                      ...backgroundSettings.adjustments,
+                                      [adj.key]: v
+                                    }
+                                  });
+                                }}
+                                min={adj.min} 
+                                max={adj.max} 
+                                className="text-[0.75vw] font-semibold text-gray-700" 
+                              />
+                              <button 
+                                onClick={() => {
+                                    onUpdateBackground({
+                                      ...backgroundSettings,
+                                      adjustments: {
+                                        ...backgroundSettings.adjustments,
+                                        [adj.key]: 0
+                                      }
+                                    });
+                                  }}
+                                className="text-gray-300 hover:text-red-500 transition-colors"
+                              >
+                                <Icon icon="ix:reset" className="w-[0.8vw] h-[0.8vw]" />
+                              </button>
+                            </div>
+                            <div 
+                              className="w-[2vw] text-right cursor-ew-resize select-none text-[0.75vw] text-gray-700 font-semibold"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startVal = val;
+                                const handleMove = (moveEvent) => {
+                                  const dx = moveEvent.clientX - startX;
+                                  const newVal = Math.max(adj.min, Math.min(adj.max, startVal + Math.round(dx)));
+                                  onUpdateBackground({ ...backgroundSettings, adjustments: { ...backgroundSettings.adjustments, [adj.key]: newVal } });
+                                };
+                                const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
+                                window.addEventListener('mousemove', handleMove);
+                                window.addEventListener('mouseup', handleUp);
+                              }}
+                            >
+                              {val}
+                            </div>
+                          </div>
+                          {/* Slider */}
+                          <div className="flex items-center">
+                            <input 
+                              type="range" 
+                              min={adj.min} max={adj.max} 
+                              value={val} 
+                              onChange={(e) => {
+                                onUpdateBackground({
+                                  ...backgroundSettings,
+                                  adjustments: {
+                                    ...backgroundSettings.adjustments,
+                                    [adj.key]: parseInt(e.target.value)
+                                  }
+                                });
+                              }}
+                              className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
+                              style={{ 
+                                background: `linear-gradient(to right, #5551FF 0%, #5551FF ${percentage}%, #f3f4f6 ${percentage}%, #f3f4f6 100%)` 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === 'Themes' && (
+        <div className="grid grid-cols-3 gap-2 px-1 pb-2">
+            <div 
+              onClick={() => {
+                setSelectedTheme(null);
+                onUpdateBackground({ 
+                  ...backgroundSettings, 
+                  style: 'Solid', 
+                  reactBitType: null, 
+                  color: backgroundSettings.savedSolidColor || backgroundSettings.color 
+                });
+              }} 
+              className="group cursor-pointer flex flex-col gap-2"
+            >
+              <div className={`aspect-video w-full h-20 rounded-lg bg-gray-50 border-2 relative overflow-hidden transition-all flex items-center justify-center ${!selectedTheme ? 'border-gray shadow-md ring-2 ring-gray-100 scale-[1.02]' : 'border-gray-100 hover:border-gray-200'}`}>
+                <Icon icon="lucide:ban" className="w-6 h-6 text-gray-300" />
+                <div className="absolute inset-x-0 bottom-0 py-1 px-2 text-center bg-gray/40 backdrop-blur-md ">
+                  <span className="text-[9px] font-semibold text-center text-gray-800">None</span>
+                </div>
+              </div>
+            </div>
+
+            {Object.keys(backgroundComponents).sort().map((name) => (
+              <div key={name} onClick={() => setSelectedTheme(name)} className="group cursor-pointer flex flex-col gap-2">
+                 <div className={`aspect-video w-full h-20 rounded-lg bg-black border-2 relative overflow-hidden transition-all ${selectedTheme === name ? 'border-gray shadow-md ring-2 ring-gray-100 scale-[1.09]' : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'}`}>
+                    {/* Preview Miniatures (Simplified) */}
+                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {name === 'Antigravity' && <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-pink-400 rotate-45"></div><div className="w-1.5 h-1.5 rounded-full bg-pink-300 -rotate-12"></div><div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div></div>}
+                        {name === 'ColorBlends' && <div className="w-full h-full bg-gradient-to-bl from-pink-400 via-purple-500 to-blue-600 opacity-50"></div>}
+                        {name === 'DarkVeil' && <div className="w-full h-full bg-black/80 flex items-center justify-center"><div className="w-full h-[1px] bg-red-500/30 blur-[1px]"></div></div>}
+                        {name === 'DotGrid' && <div className="grid grid-cols-3 gap-1 opacity-40"><div className="w-1 h-1 bg-white rounded-full"></div><div className="w-1 h-1 bg-white rounded-full"></div><div className="w-1 h-1 bg-white rounded-full"></div></div>}
+                        {name === 'FloatingLines' && <div className="flex flex-col gap-1.5 opacity-40"><div className="w-8 h-[1px] bg-blue-300"></div><div className="w-8 h-[1px] bg-pink-300 translate-x-2"></div><div className="w-8 h-[1px] bg-blue-300"></div></div>}
+                        {name === 'Galaxy' && <div className="text-white text-[10px] opacity-60">✨🌌</div>}
+                        {name === 'GridScan' && <div className="w-full h-full bg-[linear-gradient(rgba(0,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.1)_1px,transparent_1px)] bg-[size:8px_8px]"><div className="w-full h-[2px] bg-cyan-400/30"></div></div>}
+                        {name === 'Hyperspeed' && <div className="flex gap-0.5"><div className="w-10 h-[1px] bg-blue-400/50"></div><div className="w-10 h-[1px] bg-red-400/50"></div></div>}
+                        {name === 'Iridescence' && <div className="w-full h-full bg-gradient-to-tr from-green-300 via-blue-300 to-purple-300 opacity-40 blur-sm"></div>}
+                         {name === 'LightPillar' && <div className="flex gap-1.5 items-end"><div className="w-[2px] h-8 bg-white/40 shadow-[0_0_5px_white]"></div><div className="w-[1.5px] h-6 bg-white/20"></div></div>}
+                        {name === 'LightRays' && <div className="w-full h-full bg-[linear-gradient(45deg,rgba(255,255,255,0.1),transparent)] flex items-end justify-center"><div className="w-[1px] h-full bg-white/20 rotate-12"></div></div>}
+                        {name === 'LiquidEther' && <div className="w-full h-full bg-[radial-gradient(circle_at_center,_#5227FF33,_#000)] blur-[3px]"></div>}
+                        {name === 'Orb' && <div className="w-6 h-6 rounded-full bg-indigo-500/40 blur-[4px]"></div>}
+                         {name === 'Particles' && <div className="grid grid-cols-4 gap-1 opacity-50"><div className="w-1 h-1 bg-white rounded-full translate-x-1 translate-y-2"></div><div className="w-0.5 h-0.5 bg-blue-300 rounded-full"></div><div className="w-1 h-1 bg-white rounded-full"></div></div>}
+                        {name === 'PixelSnow' && <div className="grid grid-cols-4 gap-2 opacity-60"><div className="w-0.5 h-0.5 bg-white"></div><div className="w-0.5 h-0.5 bg-white"></div><div className="w-0.5 h-0.5 bg-white"></div></div>}
+                        {name === 'Prism' && <div className="w-4 h-4 rotate-45 border border-white/30 bg-white/5"></div>}
+                        {name === 'PrismaticBurst' && <div className="w-full h-full bg-[conic-gradient(from_0deg,transparent,rgba(255,255,255,0.1),transparent)]"></div>}
+                        {name === 'Silk' && <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 opacity-50 blur-[2px]"></div>}
+                        {name === 'SplashCursor' && <div className="w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(0,255,100,0.1),transparent)]"></div>}
+                        {name === 'Threads' && <div className="w-full h-full opacity-40 overflow-hidden flex flex-col gap-0.5"><div className="w-full h-[1px] bg-white opacity-20 -rotate-12 translate-y-2"></div><div className="w-full h-[1px] bg-white opacity-40 -rotate-12 translate-y-1"></div><div className="w-full h-[1px] bg-white opacity-30 -rotate-12"></div></div>}
+                        {name === 'Waves' && <div className="w-full h-full border-t border-white/20 mt-4 rounded-full"></div>}
+                     </div>
+                    
+                    <div className="absolute inset-x-0 bottom-0 py-1 px-2 text-center bg-black/10 backdrop-blur-sm ">
+                       <span className="text-[9px] font-semibold text-center text-white">{name}</span>
+                    </div>
+                 </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {activeTab === 'Animations' && (
+        <div className="grid grid-cols-3 gap-2 px-1 pb-2">
+          {/* None Option */}
+          <div 
+            onClick={() => onUpdateBackground({ ...backgroundSettings, animation: 'None' })} 
+            className="group cursor-pointer flex flex-col gap-2"
+          >
+            <div className={`aspect-video w-full h-20 rounded-lg bg-gray-50 border-2 relative overflow-hidden transition-all flex items-center justify-center ${backgroundSettings.animation === 'None' || !backgroundSettings.animation ? 'border-gray shadow-md ring-2 ring-gray-100 scale-[1.02]' : 'border-gray-100 hover:border-gray-200'}`}>
+              <Icon icon="lucide:ban" className="w-6 h-6 text-gray-300" />
+              <div className="absolute inset-x-0 bottom-0 py-1 px-2 text-center bg-gray/40 backdrop-blur-md ">
+                <span className="text-[9px] font-semibold text-center text-gray-800">None</span>
+              </div>
+            </div>
+          </div>
+
+          {Object.keys(animationComponents).sort().map((name) => (
+            <div 
+              key={name} 
+              onClick={() => onUpdateBackground({ ...backgroundSettings, animation: name })} 
+              className="group cursor-pointer flex flex-col gap-2"
+            >
+              <div className={`aspect-video w-full h-20 rounded-lg bg-black border-2 relative overflow-hidden transition-all ${backgroundSettings.animation === name ? 'border-gray shadow-md ring-2 ring-gray-100 scale-[1.09]' : 'border-gray-100 hover:border-gray-200'}`}>
+                {/* Animation Miniatures */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-white/10">
+                  {name === 'FallingLeaves' && <div className="text-red-500 text-[10px] animate-bounce">🍂</div>}
+                  {name === 'Snow' && <div className="text-white text-[12px] animate-pulse">❄️</div>}
+                  {name === 'Bubbles' && <div className="w-4 h-2 rounded-full border border-blue-300/50 bg-blue-100/20"></div>}
+                  {name === 'Confetti' && <div className="flex gap-0.5"><div className="w-1 h-1 bg-red-400"></div><div className="w-1 h-1 bg-yellow-400"></div><div className="w-1 h-1 bg-blue-400"></div></div>}
+                  {name === 'Rain' && <div className="w-[1px] h-3 bg-blue-400 rotate-[15deg] opacity-50"></div>}
+                  {name === 'Fireflies' && <div className="w-1 h-1 bg-yellow-200 rounded-full shadow-[0_0_5px_#fef08a]"></div>}
+                  {name === 'Matrix' && <div className="text-[8px] text-green-500 font-mono">1010</div>}
+                  {name === 'Hearts' && <div className="text-red-400 text-[10px]">❤</div>}
+                  {name === 'TwinklingStars' && <div className="text-white text-[10px]">⭐</div>}
+                  {name === 'Petals' && <div className="text-pink-300 text-[10px]">🌸</div>}
+                  {name === 'BinaryRain' && <div className="text-[6px] text-green-700 font-mono">0110</div>}
+                  {name === 'Balloons' && <div className="w-5 h-3 bg-violet-400 rounded-t-full"></div>}
+                  {name === 'Lightning' && <Icon icon="lucide:zap" className="w-4 h-4 text-yellow-300" />}
+                  {name === 'Orbs' && <div className="w-4 h-4 rounded-full bg-indigo-400/30 blur-[2px]"></div>}
+                  {name === 'Scanlines' && <div className="w-full h-full bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,255,255,0.05)_2px,rgba(255,255,255,0.05)_4px)]"></div>}
+                  {name === 'Fireworks' && <div className="text-orange-400 text-[10px]">🎆</div>}
+                  {name === 'Glitch' && <div className="w-4 h-2 bg-blue-500/30 skew-x-12"></div>}
+                  {name === 'Butterflies' && <div className="text-purple-400 text-[10px]">🦋</div>}
+                  {name === 'Clouds' && <Icon icon="lucide:cloud" className="w-4 h-4 text-white opacity-40" />}
+                  {name === 'SpaceWarp' && <div className="text-white text-[8px]">✨🚀</div>}
+                  {name === 'Jellyfish' && <div className="text-cyan-400 text-[10px]">🏮</div>}
+                  {name === 'PaperPlanes' && <Icon icon="lucide:send" className="w-4 h-4 text-white/40" />}
+                  {name === 'MusicalNotes' && <div className="text-white/40 text-[10px]">♪♫</div>}
+                  {name === 'AutumnMix' && <div className="text-orange-600 text-[10px]">🍂🎃</div>}
+                  {name === 'FloatingGeo' && <div className="w-3 h-3 border border-white/20 rotate-45"></div>}
+                  {name === 'DustMotes' && <div className="w-0.5 h-0.5 bg-white/40 rounded-full"></div>}
+                  {name === 'Nebula' && <div className="w-6 h-6 rounded-full bg-purple-500/20 blur-[4px]"></div>}
+                  {name === 'Birds' && <div className="text-black/40 text-[10px]">🐦</div>}
+                  {name === 'Plankton' && <div className="w-1 h-1 bg-cyan-200/30 rounded-full"></div>}
+                  {name === 'FireEmbers' && <div className="w-1 h-1 bg-orange-500 rounded-full"></div>}
+                  {name === 'WaterDrops' && <div className="w-2 h-3 bg-blue-200/20 rounded-full"></div>}
+                  {name === 'Mist' && <div className="w-full h-2 bg-white/20 blur-[2px] mt-4"></div>}
+                  {name === 'Disco' && <div className="w-4 h-4 rounded-full bg-gradient-to-r from-red-500 to-blue-500 opacity-40"></div>}
+                  {name === 'Meteors' && <div className="w-4 h-[1px] bg-white rotate-45"></div>}
+                  {name === 'Sparkles' && <div className="text-yellow-200 text-[10px]">✨</div>}
+                </div>
+                
+               <div className="absolute inset-x-0 bottom-0 py-1 px-2 text-center bg-black/10 backdrop-blur-sm ">
+                      <span className="text-[9px] font-semibold text-center text-white">{name}</span>
+                   </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BackgroundSection;
