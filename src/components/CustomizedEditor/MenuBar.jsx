@@ -110,7 +110,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
        <div className="flex-1 flex flex-col gap-[0.6vw]">
           {/* Heading Inputs */}
           <div 
-            className={`flex items-center gap-[0.6vw] relative group ${isHeadActive ? 'p-[0.3vw] bg-[#3F37C9] rounded-[0.5vw] border-[1px] border-[#3F37C9] shadow-sm' : ''}`}
+            className={`flex items-center gap-[0.3vw] relative group ${isHeadActive ? 'p-[0.3vw] bg-[#3F37C9] rounded-[0.5vw] border-[1px] border-[#3F37C9] shadow-sm' : ''}`}
             onClick={() => setActiveTOCItem({ type: 'head', index })}
           >
              <div className={`flex-1 relative ${isHeadActive ? 'bg-white rounded-[0.3vw] flex items-center px-[0.6vw]' : 'flex items-center'}`}>
@@ -119,7 +119,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                   placeholder={`Heading ${index + 1}`}
                   value={item.title || ''}
                   onChange={(e) => onUpdate({ ...item, title: e.target.value })}
-                  className={`w-full h-[2.6vw] text-[0.85vw] outline-none transition-all placeholder-[#BCC2CF] ${
+                  className={`w-full h-[2.6vw] text-[0.85vw] border-gray-900 transition-all placeholder-[#BCC2CF] ${
                     isHeadActive 
                     ? 'text-gray-900 h-[2vw]' 
                     : 'px-[0.8vw] text-gray-400 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] shadow-sm'
@@ -133,7 +133,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                       e.stopPropagation();
                       onDelete();
                     }}
-                    className="text-red-500 hover:text-red-600 p-[0.2vw]"
+                    className="text-red-500 hover:text-red-600 p-[0.2vw] "
                     title="Delete Heading"
                   >
                     <Trash2 size="1vw" strokeWidth={2} />
@@ -146,7 +146,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                   value={item.page || ''}
                   placeholder={String(index + 1)}
                   onChange={(e) => onUpdate({ ...item, page: e.target.value })}
-                  className={`text-center text-[0.85vw] outline-none transition-all ${
+                  className={`text-center text-[0.85vw] border-gray-900 transition-all ${
                     isHeadActive 
                     ? 'w-full text-gray-900 bg-transparent' 
                     : 'w-[2.6vw] h-[2.6vw] text-gray-400 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] shadow-sm'
@@ -161,7 +161,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
              return (
                <div 
                  key={sub.id || sIdx} 
-                 className="flex items-center gap-[0.5vw] relative ml-[1.8vw] mb-[0.4vw]"
+                 className="flex items-center relative ml-[1.8vw]"
                  onClick={(e) => {
                    e.stopPropagation();
                    setActiveTOCItem({ type: 'sub', index, sIdx });
@@ -169,12 +169,12 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                >
                   {/* L-shaped dashed connector */}
                   <div 
-                    className={`absolute left-[-1.1vw] w-[1vw] border-l-[1.2px] border-b-[1.2px] border-dashed border-[#8E99AF] rounded-bl-[0.3vw] pointer-events-none ${
-                      sIdx === 0 ? 'top-[-0.6vw] h-[2.1vw]' : 'top-[-1.9vw] h-[3.1vw]'
+                    className={`absolute left-[-1.1vw] w-[1.1vw] border-l-[1.8px] border-b-[1.8px] border-dashed border-[#373D8A] rounded-bl-[0.2vw] pointer-events-none ${
+                      sIdx === 0 ? 'top-[-0.6vw] h-[2.1vw]' : 'top-[-1.3vw] h-[3.1vw]'
                     }`}
                   ></div>
                   
-                  <div className={`flex-1 flex items-center gap-[0.6vw] relative group ${isSubActive ? 'p-[0.3vw] bg-[#3F37C9] rounded-[0.5vw] border-[1px] border-[#3F37C9] shadow-sm' : ''}`}>
+                  <div className={`flex-1 flex items-center gap-[0.3vw] relative group ${isSubActive ? 'p-[0.3vw] bg-[#3F37C9] rounded-[0.5vw] border-[1px] border-[#3F37C9] shadow-sm' : ''}`}>
                     <div className={`flex-1 relative ${isSubActive ? 'bg-white rounded-[0.3vw] flex items-center px-[0.6vw]' : 'flex items-center'}`}>
                       <input
                         type="text"
@@ -185,15 +185,15 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                             newSubs[sIdx] = { ...sub, title: e.target.value };
                             onUpdate({ ...item, subheadings: newSubs });
                         }}
-                        className={`w-full h-[2.4vw] text-[0.85vw] outline-none transition-all placeholder-[#BCC2CF] ${
+                        className={`w-full h-[2.4vw] text-[0.85vw] border-gray-900 transition-all placeholder-[#BCC2CF] ${
                           isSubActive 
-                          ? 'text-gray-900 h-[2vw]' 
-                          : 'px-[0.2vw] text-gray-400 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] shadow-sm'
+                          ? 'text-gray-400 h-[2vw]' 
+                          : 'px-[0.2vw] text-gray-700 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] shadow-sm'
                         }`}
                       />
                       
                       {/* Actions for Subheading: Show on Hover or Active */}
-                      <div className={`flex items-center gap-[0.1vw] ml-auto ${isSubActive ? '' : 'absolute right-[0.5vw] opacity-0 group-hover:opacity-100 transition-opacity'}`}>
+                      <div className={`flex items-center ml-auto ${isSubActive ? '' : 'absolute right-[0.5vw] opacity-0 group-hover:opacity-100 transition-opacity'}`}>
                         <button 
                           onClick={(e) => {
                               e.stopPropagation();
@@ -207,7 +207,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                         </button>
                       </div>
                     </div>
-                    <div className={`${isSubActive ? 'w-[2.6vw] h-[1.8vw] bg-white rounded-[0.3vw] flex items-center justify-center' : ''}`}>
+                    <div className={`${isSubActive ? 'w-[2vw] h-[2vw] bg-white rounded-[0.3vw] flex items-center justify-center' : ''}`}>
                       <input
                         type="text"
                         value={sub.page || ''}
@@ -217,10 +217,10 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                            newSubs[sIdx] = { ...sub, page: e.target.value };
                            onUpdate({ ...item, subheadings: newSubs });
                         }}
-                        className={`text-center text-[0.85vw] outline-none transition-all ${
+                        className={`text-center text-[0.85vw] border-gray-900 transition-all ${
                           isSubActive 
                           ? 'w-full text-gray-900 bg-transparent' 
-                          : 'w-[2.6vw] h-[2.4vw] text-gray-400 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] shadow-sm'
+                          : 'w-[2.6vw] h-[2.4vw] text-gray-400 border border-[#BCBCBC] rounded-[0.6vw] hover:border-[#3F37C9] focus:border-[#3F37C9] '
                         }`}
                       />
                     </div>
@@ -238,7 +238,7 @@ const TocItem = ({ item, index, onUpdate, onDelete, settings, activeTOCItem, set
                 onUpdate({ ...item, subheadings: newSubs });
                 setActiveTOCItem({ type: 'sub', index, sIdx: newSubs.length - 1 });
               }}
-              className="text-gray-400 hover:text-gray-800 transition-colors p-[0.2vw]"
+              className="text-gray-400  hover:text-gray-800 transition-colors p-[0.2vw]"
               title="Add Subheading"
             >
                <Icon icon="lucide:square-pen" className="w-[1vw] h-[1vw]" strokeWidth={2} />
@@ -421,7 +421,7 @@ const MenuBar = ({ onBack, settings, onUpdate }) => {
                       <div className="h-[1.5px] bg-[#E2E8F0] flex-1"></div>
                     </div>
 
-                    <div className="space-y-[0.5vw] max-h-[30vw] overflow-y-auto pr-[0.4vw] custom-scrollbar">
+                    <div className="space-y-[0.2vw] max-h-[30vw] overflow-y-auto pr-[0.4vw] custom-scrollbar">
                       {settings.tocSettings?.content?.map((item, idx) => (
                         <TocItem 
                            key={idx}
@@ -482,8 +482,8 @@ const MenuBar = ({ onBack, settings, onUpdate }) => {
                        </button>
                     </div>
 
-                    <div className="mt-[1vw] pt-[1vw] border-t border-gray-100 flex justify-end">
-                       <button className="bg-[#4D39FF] text-white px-[1vw] py-[0.3vw] rounded-[0.7vw] text-[0.8vw] font-medium hover:bg-[#3F2CFF] transition-all active:scale-95">
+                    <div className="mt-[0.5vw] pt-[0.5vw] pr-[0.4vw] border-t border-gray-300 flex justify-end">
+                       <button className="bg-[#4D39FF] text-white px-[1vw] py-[0.3vw] rounded-[0.5vw] text-[0.8vw] font-medium hover:bg-[#3F2CFF] transition-all active:scale-95">
                          Save
                        </button>
                     </div>

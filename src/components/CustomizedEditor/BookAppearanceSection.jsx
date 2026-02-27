@@ -16,7 +16,7 @@ const BookAppearanceSection = ({
   const [shadowPickerPos, setShadowPickerPos] = useState({ x: 0, y: 0 });
 
   return (
-    <div className="p-[1vw] ">
+    <div className="p-[1vw]">
       {/* Book Paper Texture */}
       <div className="space-y-[1vw]">
         <div className="flex items-center mb-[0.2vw]">
@@ -27,9 +27,9 @@ const BookAppearanceSection = ({
           The chosen paper texture will be applied to every page of the flipbook.
         </p>
         
-        <div className="flex items-center gap-[1.5vw] py-[0.5vw]">
+        <div className="flex items-center gap-[0.5vw] py-[0.5vw] pl-[0.3vw]">
           <div className="relative group">
-            <div className="w-[4.8vw] h-[4.8vw] bg-white rounded-[0.8vw] shadow-md border border-gray-100 overflow-hidden flex items-center justify-center transition-transform hover:scale-105 duration-300">
+            <div className="w-[4.5vw] h-[4.5vw] bg-white rounded-[1vw] shadow-sm border border-gray-200 overflow-hidden flex items-center justify-center transition-transform hover:scale-105 duration-300">
               {bookAppearanceSettings?.texture && bookAppearanceSettings.texture !== 'Plain White' ? (
                 <div 
                    className="w-full h-full"
@@ -47,14 +47,14 @@ const BookAppearanceSection = ({
           </div>
           
           <div className="flex-1 space-y-[1vw]">
-            <div className="flex items-center justify-between">
-              <span className="text-[0.75vw] font-semibold text-gray-700">Texture :</span>
+            <div className="flex items-center ">
+              <span className="text-[0.75vw] font-semibold text-gray-700 pr-[0.5vw]">Texture :</span>
               <PremiumDropdown 
                 options={['Plain White', 'Soft Matte Paper', 'Premium Art Paper', 'Photo Album Paper', 'Soft Linen Paper', 'Light Grain Paper', 'Fine Texture Paper', 'Smooth Print Paper', 'Fiber Paper',  'Canvas Texture', 'Kraft Paper', 'Felt Paper', 'Watermarked Paper', 'Premium Vellum']}
                 value={bookAppearanceSettings?.texture || 'Soft Matte Paper'}
                 onChange={(opt) => onUpdateBookAppearance({...bookAppearanceSettings, texture: opt})}
-                width="7vw"
-                className="!border-gray-200 !rounded-[0.5vw]"
+                width="9vw"
+                className="!border-gray-900 !rounded-[0.5vw]"
                 align="right"
               />
             </div>
@@ -81,7 +81,7 @@ const BookAppearanceSection = ({
       </div>
 
       {/* Sliders Section */}
-      <div className="space-y-[0vw] pb-[0.5vw]">
+      <div className="space-y-[0.5vw] pb-[0.8vw] pt-[0.8vw] pl-[0.3vw]">
         {[
           { label: 'Grain Intensity', key: 'grainIntensity', min: -100, max: 100 },
           { label: 'Warmth', key: 'warmth', min: -100, max: 100 },
@@ -238,7 +238,7 @@ const BookAppearanceSection = ({
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between px-2 py-1 border rounded bg-gray-50">
                <span className="text-[0.7vw] font-mono">{bookAppearanceSettings?.dropShadow?.color || '#000000'}</span>
-               <Icon icon="lucide:pen-line" className="w-3 h-3 text-gray-400" />
+               <Icon icon="mdi:pipette-varian" className="w-3 h-3 text-gray-400" />
             </div>
             <input
               type="range"

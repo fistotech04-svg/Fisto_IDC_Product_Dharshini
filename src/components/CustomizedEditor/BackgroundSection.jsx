@@ -5,7 +5,6 @@ import backgroundComponents from './Backgrounds';
 import animationComponents from './Animations';
 import PremiumDropdown from './PremiumDropdown';
 import {
-  DraggableSpan, 
   solidPalette,
   hexToRgb,
   generateGradientString,
@@ -552,8 +551,8 @@ const BackgroundSection = ({
             </div>
           ) : (
             <div>
-              <div className="mb-[2vw]">
-                <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw] pb-[1vw]">
+              <div className="mb-[0.5vw]">
+                <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw]">
                   <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Upload Image</span>
                   <div className="h-[1px] flex-grow bg-gray-100 mt-[0.2vw]"></div>
                 </div>
@@ -574,28 +573,73 @@ const BackgroundSection = ({
                 />
 
                 {backgroundSettings.image ? (
-                  <div className="flex items-center justify-between gap-2 px-1 pb-6">
-                    <div className="relative w-[85px] h-[55px] rounded-lg overflow-hidden border border-gray-200 group">
-                      <img src={backgroundSettings.image} alt="Thumbnail" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => onUpdateBackground({ ...backgroundSettings, image: null })}>
-                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                  <div className="flex items-stretch gap-[0.75vw] pb-[1.25vw]">
+                    {/* Current Image */}
+                    <div className="flex flex-col items-center gap-[0.35vw]">
+                      <div className="relative w-[5.5vw] h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] overflow-hidden bg-white flex items-center justify-center group">
+                        <img src={backgroundSettings.image} alt="Thumbnail" className="w-full h-full object-cover" />
+                        {/* Hover overlay */}
+                        <div
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-[0.2vw] cursor-pointer"
+                          onClick={() => onUpdateBackground({ ...backgroundSettings, image: null })}
+                        >
+                          <Icon icon="lucide:trash-2" className="w-[1.1vw] h-[1.1vw] text-white" />
+                          <span className="text-[0.5vw] text-white font-semibold">Remove</span>
+                        </div>
                       </div>
+                      <span className="text-[0.6vw] font-semibold text-gray-400">Current</span>
                     </div>
-                     <div onClick={() => fileInputRef.current?.click()} className="flex-1 h-[55px] border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 transition-all">
-                        <Icon icon="lucide:upload" className="w-4 h-4 text-gray-400 mb-0.5" />
-                        <p className="text-[9px] font-semibold text-gray-500">Upload replacement</p>
+
+                    {/* Arrow */}
+                    <div className="flex items-center justify-center pb-[1vw] shrink-0">
+                      <Icon icon="qlementine-icons:replace-16" className="w-[1.1vw] h-[1.1vw] text-gray-300" />
+                    </div>
+
+                    {/* Replace Upload Box */}
+                    <div className="flex flex-col items-center gap-[0.35vw] flex-1">
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-400', 'bg-indigo-50/20'); }}
+                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/20'); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/20');
+                          const file = e.dataTransfer.files[0];
+                          if (file && file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => onUpdateBackground({ ...backgroundSettings, image: event.target.result });
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="flex-1 w-full h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/10 transition-all bg-white"
+                      >
+                        <Icon icon="lucide:upload-cloud" className="w-[1.2vw] h-[1.2vw] text-blue-400 opacity-70 mb-[0.15vw]" />
+                        <p className="text-[0.58vw] font-medium text-gray-500 text-center leading-snug px-[0.3vw]">
+                          Drag & Drop or{' '}
+                          <span className="text-blue-500 font-semibold">Upload</span>
+                        </p>
                       </div>
+                    <span className="text-[0.6vw] font-semibold text-gray-400  ">Supported File Format : JPG, PNG</span>
+                   </div>
                   </div>
                 ) : (
-                  <div onClick={() => fileInputRef.current?.click()} className="w-full h-24 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-500 transition-all group">
-                    <Icon icon="lucide:upload" className="w-6 h-6 text-gray-400" />
-                    <p className="text-xs font-semibold text-gray-500">Click to upload background</p>
-                  </div>
+                 <div className="flex flex-col gap-[1vw] mb-[1vw]">
+                             <div className="flex flex-col items-center">
+                               <div 
+                                 onClick={() => fileInputRef.current?.click()}
+                                 className="w-[13vw] h-[6vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.75vw] flex flex-col items-center justify-center gap-[0.5vw] cursor-pointer hover:border-indigo-500 transition-all group bg-white"
+                               >
+                                 <Icon icon="lucide:upload" className="w-[1.5vw] h-[1.5vw] text-gray-400 mb-[0.25vw]" />
+                                 <p className="text-[0.75vw] font-semibold text-gray-500 text-center">Drag & Drop or <span className="text-indigo-500">Upload</span></p>
+                               </div>
+                               <p className="text-[0.625vw] text-gray-400 mt-[0.5vw] font-semibold text-center normal-case">Supported File Format : JPG, PNG</p>
+                             </div>
+                             </div>
                 )}
 
                 <button 
                               onClick={() => setShowGallery(true)}
-                              className="relative w-full h-[3.5vw] bg-black rounded-[0.5vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
+                              className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
                             >
                               {/* Background Images Overlay */}
                               <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
@@ -612,154 +656,39 @@ const BackgroundSection = ({
                               {/* Dark Gradient Overlay */}
                               <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
                               
-                              {/* Content */}
-                              <div className="relative z-10 flex items-center gap-[0.75vw]">
-                                  <Icon icon="lucide:images" className="w-[1.2vw] h-[1.2vw] text-white" />
-                                <span className="text-[0.85vw] font-bold text-white tracking-wide">Image Gallery</span>
-                              </div>
+                             {/* Content */}
+                           <div className="relative z-10 flex items-center gap-[0.75vw]">
+                               <Icon icon="clarity:image-gallery-solid" className="w-[1vw] h-[1.2vw] text-white" />
+                             <span className="text-[0.95vw] font-semibold text-white ">Image Gallery</span>
+                           </div>
                             </button>
               </div>
 
               {backgroundSettings.image && (
-                <div className="space-y-[1.25vw] pt-[1.5vw]">
-                  <div className="flex items-center justify-between">
-                  <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
-                  <div className="h-[1px] flex-grow bg-gray-200 ml-[1vw] mt-[0.2vw]"></div>
+                <div className="space-y-[0.5vw] pt-[1.5vw]">
+                  <div className="flex items-center">
+                    <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
+                    <div className="h-[0.0925vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
                   </div>
-                  <div className="flex items-center gap-[0.75vw]">
+                  <div className="flex items-center justify-between">
                     <input 
                       type="range" 
                       min="0" max="100" 
                       value={backgroundSettings.opacity} 
                       onChange={(e) => onUpdateBackground({ ...backgroundSettings, opacity: parseInt(e.target.value) })}
-                      className="flex-1 h-[0.35vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
+                      className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
                       style={{ 
                         background: `linear-gradient(to right, #5551FF 0%, #5551FF ${backgroundSettings.opacity}%, #f3f4f6 ${backgroundSettings.opacity}%, #f3f4f6 100%)` 
                       }}
                     />
-                    <div 
-                      className="w-[3.5vw] h-[2.2vw] border border-gray-100 rounded-[0.5vw] flex items-center justify-center bg-white cursor-ew-resize select-none text-[0.8vw] text-gray-800 font-semibold shadow-sm"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const startX = e.clientX;
-                        const startVal = backgroundSettings.opacity;
-                        const handleMove = (moveEvent) => {
-                          const dx = moveEvent.clientX - startX;
-                          const newVal = Math.max(0, Math.min(100, startVal + Math.round(dx)));
-                          onUpdateBackground({ ...backgroundSettings, opacity: newVal });
-                        };
-                        const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-                        window.addEventListener('mousemove', handleMove);
-                        window.addEventListener('mouseup', handleUp);
-                      }}
-                    >
+                    <span className="w-[2vw] text-right text-[0.75vw] text-gray-700 font-semibold">
                       {backgroundSettings.opacity}%
-                    </div>
+                    </span>
                   </div>
                 </div>
               )}
 
-              {backgroundSettings.image && (
-                <div className="space-y-[1.5vw] pt-[1.5vw]">
-                  <div className="flex items-center">
-                    <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Adjustments</span>
-                    <div className="h-[1px] flex-grow bg-gray-200 ml-[1vw] mt-[0.2vw]"></div>
-                  </div>
 
-                  <div className="space-y-[0.1vw]">
-                    {[
-                      { label: 'Exposure', key: 'exposure', min: -100, max: 100 },
-                      { label: 'Contrast', key: 'contrast', min: -100, max: 100 },
-                      { label: 'Saturation', key: 'saturation', min: -100, max: 100 },
-                      { label: 'Temperature', key: 'temperature', min: -100, max: 100 },
-                      { label: 'Tint', key: 'tint', min: -180, max: 180 },
-                      { label: 'Highlights', key: 'highlights', min: -100, max: 100 },
-                      { label: 'Shadows', key: 'shadows', min: -100, max: 100 },
-                    ].map((adj) => {
-                      const val = backgroundSettings.adjustments?.[adj.key] || 0;
-                      const percentage = ((val - adj.min) / (adj.max - adj.min)) * 100;
-                      return (
-                        <div key={adj.key}>
-                          {/* Label + Reset + Value */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-[0.2vw]">
-                              <DraggableSpan 
-                                label={adj.label} 
-                                value={val} 
-                                onChange={(v) => {
-                                  onUpdateBackground({
-                                    ...backgroundSettings,
-                                    adjustments: {
-                                      ...backgroundSettings.adjustments,
-                                      [adj.key]: v
-                                    }
-                                  });
-                                }}
-                                min={adj.min} 
-                                max={adj.max} 
-                                className="text-[0.75vw] font-semibold text-gray-700" 
-                              />
-                              <button 
-                                onClick={() => {
-                                    onUpdateBackground({
-                                      ...backgroundSettings,
-                                      adjustments: {
-                                        ...backgroundSettings.adjustments,
-                                        [adj.key]: 0
-                                      }
-                                    });
-                                  }}
-                                className="text-gray-300 hover:text-red-500 transition-colors"
-                              >
-                                <Icon icon="ix:reset" className="w-[0.8vw] h-[0.8vw]" />
-                              </button>
-                            </div>
-                            <div 
-                              className="w-[2vw] text-right cursor-ew-resize select-none text-[0.75vw] text-gray-700 font-semibold"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                const startX = e.clientX;
-                                const startVal = val;
-                                const handleMove = (moveEvent) => {
-                                  const dx = moveEvent.clientX - startX;
-                                  const newVal = Math.max(adj.min, Math.min(adj.max, startVal + Math.round(dx)));
-                                  onUpdateBackground({ ...backgroundSettings, adjustments: { ...backgroundSettings.adjustments, [adj.key]: newVal } });
-                                };
-                                const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-                                window.addEventListener('mousemove', handleMove);
-                                window.addEventListener('mouseup', handleUp);
-                              }}
-                            >
-                              {val}
-                            </div>
-                          </div>
-                          {/* Slider */}
-                          <div className="flex items-center">
-                            <input 
-                              type="range" 
-                              min={adj.min} max={adj.max} 
-                              value={val} 
-                              onChange={(e) => {
-                                onUpdateBackground({
-                                  ...backgroundSettings,
-                                  adjustments: {
-                                    ...backgroundSettings.adjustments,
-                                    [adj.key]: parseInt(e.target.value)
-                                  }
-                                });
-                              }}
-                              className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
-                              style={{ 
-                                background: `linear-gradient(to right, #5551FF 0%, #5551FF ${percentage}%, #f3f4f6 ${percentage}%, #f3f4f6 100%)` 
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </>
@@ -892,6 +821,34 @@ const BackgroundSection = ({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Solid Color Picker */}
+      {showColorPicker && (
+        <CustomColorPicker
+          color={backgroundSettings.style === 'ReactBits' && backgroundSettings.savedSolidColor ? backgroundSettings.savedSolidColor : backgroundSettings.color}
+          onChange={(color) => {
+             handleColorSelect(color);
+          }}
+          onClose={() => setShowColorPicker(false)}
+          position={pickerPos}
+        />
+      )}
+
+      {/* Gradient Stop Color Picker */}
+      {editingGradientStopIndex !== null && backgroundSettings.gradientStops && (
+        <CustomColorPicker
+          color={backgroundSettings.gradientStops[editingGradientStopIndex].color}
+          opacity={backgroundSettings.gradientStops[editingGradientStopIndex].opacity || 100}
+          onChange={(color) => {
+             updateGradientStop(editingGradientStopIndex, { color });
+          }}
+          onOpacityChange={(opacity) => {
+             updateGradientStop(editingGradientStopIndex, { opacity });
+          }}
+          onClose={() => setEditingGradientStopIndex(null)}
+          position={pickerPos}
+        />
       )}
     </div>
   );

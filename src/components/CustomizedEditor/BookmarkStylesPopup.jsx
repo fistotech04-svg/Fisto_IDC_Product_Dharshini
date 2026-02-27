@@ -60,8 +60,8 @@ const BookmarkStylesPopup = ({ onClose, onSelect, currentStyle }) => {
     const styles = [1, 2, 3, 4, 5, 6];
 
     return (
-        <div className="fixed z-[1000] bg-white border border-gray-100 rounded-[12px] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ width: '300px', height: '220px', top: '60%', left: '25vw', transform: 'translate(-50%, -50%)' }}>
-          <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
+        <div className="fixed z-[1000] bg-white border border-gray-100 rounded-[12px] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ width: '330px', height: '240px', top: '60%', left: '25vw', transform: 'translate(-50%, -50%)' }}>
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
             <div 
                 className="bg-white rounded-[1.2vw] w-full max-w-[60vw] p-[0.2vw] animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
@@ -85,7 +85,7 @@ const BookmarkStylesPopup = ({ onClose, onSelect, currentStyle }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-center gap-[0.5vw] pt-[0.5vw] pl-[6vw] border-t border-[#F1F5F9]">
+                <div className="flex items-center justify-center gap-[0.5vw] pt-[0.8vw] pl-[7vw] border-t border-[#F1F5F9]">
                     <button 
                         onClick={onClose}
                         className="flex items-center gap-[0.3vw] px-[0.5vw] py-[0.2vw] rounded-sm border-[0.1vw] border-gray-500 text-gray-900 font-semibold text-[0.9vw] hover:bg-gray-50 transition-all active:scale-95"

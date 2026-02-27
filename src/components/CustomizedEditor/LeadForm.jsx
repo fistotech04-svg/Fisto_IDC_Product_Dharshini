@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import PremiumDropdown from './PremiumDropdown';
+import ColorPallet from './ColorPallet';
 
 const fontFamilies = [
   'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
@@ -267,31 +268,74 @@ const LeadForm = ({ onBack, settings, onUpdate, pages = [] }) => {
   );
 };
 
-const ColorPickerItem = ({ label, color, onChange }) => (
-    <div className="flex items-center gap-[0.75vw]">
-        <span className="w-[4.5vw] text-[0.75vw] font-semibold text-gray-700 shrink-0">{label}</span>
-        <div className="flex-1 flex items-center gap-[0.5vw]">
-            <div 
-                className="w-[2.2vw] h-[1.8vw] rounded-[0.4vw] border border-gray-300 cursor-pointer overflow-hidden relative shadow-sm"
-                style={{ backgroundColor: color === '#' || !color || color === 'transparent' ? 'white' : color }}
-            >
-                {(color === '#' || !color || color === 'transparent') && (
-                     <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.1vw] bg-red-500 rotate-45"></div>
-                )}
-                <input 
-                    type="color" 
-                    value={color && color.startsWith('#') && color.length === 7 ? color : '#ffffff'} 
-                    onChange={(e) => onChange(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                />
+const ColorPickerItem = ({ label, color, onChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
+    const pickerRef = useRef(null);
+    const swatchRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (pickerRef.current && !pickerRef.current.contains(event.target) && 
+                swatchRef.current && !swatchRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+
+    const handleOpen = () => {
+        if (!isOpen && swatchRef.current) {
+            const rect = swatchRef.current.getBoundingClientRect();
+            // Position picker to the left of the button to avoid getting cut off
+            setPickerPos({ x: rect.left - 270, y: rect.top });
+        }
+        setIsOpen(!isOpen);
+    };
+
+    return (
+        <div className="flex items-center gap-[0.75vw] relative">
+            <span className="w-[4.5vw] text-[0.75vw] font-semibold text-gray-700 shrink-0">{label}</span>
+            <div className="flex-1 flex items-center gap-[0.5vw]">
+                <div 
+                    ref={swatchRef}
+                    className="w-[2.2vw] h-[1.8vw] rounded-[0.4vw] border border-gray-300 cursor-pointer overflow-hidden relative shadow-sm"
+                    style={{ backgroundColor: color === '#' || !color || color === 'transparent' ? 'white' : color }}
+                    onClick={handleOpen}
+                >
+                    {(color === '#' || !color || color === 'transparent') && (
+                         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.1vw] bg-red-500 rotate-45"></div>
+                    )}
+                </div>
+                <div className="flex-1 flex items-center bg-white border border-gray-100 rounded-[0.4vw] px-[0.6vw] py-[0.2vw] h-[1.8vw] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <span className="text-[0.7vw] font-medium text-gray-600 flex-1">{color && color.length > 1 ? color.toUpperCase() : '#'}</span>
+                    <div className="w-[1px] h-[70%] bg-gray-100 mx-[0.4vw]"></div>
+                    <div className="text-[0.75vw] font-semibold text-gray-800 w-[2.5vw] text-right">100%</div>
+                </div>
             </div>
-            <div className="flex-1 flex items-center bg-white border border-gray-100 rounded-[0.4vw] px-[0.6vw] py-[0.2vw] h-[1.8vw] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                <span className="text-[0.7vw] font-medium text-gray-600 flex-1">{color && color.length > 1 ? color.toUpperCase() : '#'}</span>
-                <div className="w-[1px] h-[70%] bg-gray-100 mx-[0.4vw]"></div>
-                <div className="text-[0.75vw] font-semibold text-gray-800 w-[2.5vw] text-right">100%</div>
-            </div>
+            {isOpen && (
+                <div 
+                    ref={pickerRef}
+                    className="fixed z-[9999]"
+                    style={{ top: pickerPos.y, left: pickerPos.x }}
+                >
+                    <ColorPallet 
+                        color={color && color.startsWith('#') && color.length >= 7 ? color.substring(0, 7) : '#ffffff'} 
+                        onChange={onChange}
+                        opacity={100}
+                        onClose={() => setIsOpen(false)}
+                    />
+                </div>
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 export default LeadForm;

@@ -900,30 +900,31 @@ const OtherSetup = ({ onBack, settings, onUpdate, folderName, bookName }) => {
               <input type="file" ref={replaceInputRef} onChange={handleReplaceFileChange} accept="image/png, image/jpeg, image/jpg, .png, .jpg, .jpeg" className="hidden" />
             
             {/* Library Access Button */}
-             <button 
-                onClick={() => {
-                  setLibraryTargetIndex(null);
-                  setShowLibrary(true);
-                }}
-                className="relative w-full h-[3vw] mb-[1.25vw] bg-black rounded-[1vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
-             >
-                {/* Background Images Overlay */}
-                <div className="absolute inset-0 flex gap-[1px] opacity-40 group-hover:opacity-50 transition-opacity">
-                  <div className="flex-1 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1493612276216-ee3925520721?q=80&w=300&auto=format&fit=crop')" }}></div>
-                  <div className="flex-1 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?q=80&w=300&auto=format&fit=crop')" }}></div>
-                </div>
-                
-                {/* Dark Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-black/80 group-hover:via-black/20 transition-all"></div>
-                
-                {/* Content */}
-                <div className="relative z-10 flex items-center gap-[0.75vw]">
-                  <div className="p-[0.3vw] bg-white/10 backdrop-blur-md rounded-[0.4vw] border border-white/20">
-                    <Icon icon="lucide:images" className="w-[1.2vw] h-[1.2vw] text-white" />
-                  </div>
-                  <span className="text-[0.85vw] font-bold text-white tracking-wide">Image Gallery</span>
-                </div>
-             </button>
+              <button 
+                           onClick={() => setShowGallery(true)}
+                           className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
+                         >
+                           {/* Background Images Overlay */}
+                           <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
+                             <div className="flex-1 bg-cover bg-center" 
+                             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1493612276216-ee3925520721?q=80&w=300&auto=format&fit=crop')" }}>
+                             </div>
+                             <div className="flex-1 bg-cover bg-center" 
+                              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=300&auto=format&fit=crop')" }}>
+                             </div>
+                             <div className="flex-1 bg-cover bg-center" 
+                                 style={{ backgroundImage: "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=300&auto=format&fit=crop')" }}>
+                             </div>
+                           </div>
+                           {/* Dark Gradient Overlay */}
+                           <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
+                           
+                           {/* Content */}
+                           <div className="relative z-10 flex items-center gap-[0.75vw]">
+                               <Icon icon="clarity:image-gallery-solid" className="w-[1vw] h-[1.2vw] text-white" />
+                             <span className="text-[0.95vw] font-semibold text-white ">Image Gallery</span>
+                           </div>
+                         </button>
           
              {/* ── AUTO MODE SECTIONS ────────────────────────────────── */}
              {gallery.autoPlay !== false && (
@@ -1108,7 +1109,7 @@ const OtherSetup = ({ onBack, settings, onUpdate, folderName, bookName }) => {
         {/* Image Library Pop-up (Library of uploaded images) */}
         {showLibrary && (
            <div className="fixed z-[1000] bg-white border border-gray-100 rounded-[0.8vw] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" 
-                style={{ width: '20vw', height: '35vw', top: '50%', left: '50%', transform: 'translate(25%, -50%)' }}>
+                 style={{ width: '320px', height: '540px', top: '50%', left: '24vw', transform: 'translate(-50%, -50%)' }}>
              <div className="flex items-center justify-between px-[1vw] py-[1vw] border-b border-gray-100">
                <h2 className="text-[1vw] font-semibold text-gray-900">Image Gallery</h2>
                <button onClick={() => setShowLibrary(false)} className="w-[1.8vw] h-[1.8vw] flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">

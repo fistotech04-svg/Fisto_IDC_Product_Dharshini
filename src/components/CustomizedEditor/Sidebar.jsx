@@ -11,7 +11,7 @@ import Statistic from './Statistic';
 const SubNavItem = ({ label, icon, isActive, onClick }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-[0.75vw] px-[1.75vw] py-[0.75vw] rounded-[1vw] transition-all text-[0.75vw] font-semibold text-left ${
+    className={`w-full flex items-center gap-[0.75vw] px-[1.75vw] py-[0.75vw] rounded-[0.6vw] transition-all text-[0.75vw] font-semibold text-left ${
       isActive 
         ? 'bg-[#DBDBEA] text-[#3E4491]' 
         : 'hover:bg-[#DBDBEA] text-[#3E4491]'

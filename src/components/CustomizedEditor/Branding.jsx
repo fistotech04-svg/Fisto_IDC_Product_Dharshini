@@ -9,35 +9,6 @@ const fontFamilies = [
   'Inter', 'Playfair Display', 'Oswald', 'Merriweather'
 ];
 
-const DraggableSpan = ({ label, value, onChange, min = 0, max = 100, className }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const startXRef = useRef(0);
-  const startValRef = useRef(0);
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleMove = (e) => {
-      const dx = e.clientX - startXRef.current;
-      const newVal = Math.max(min, Math.min(max, startValRef.current + Math.round(dx)));
-      onChange(newVal);
-    };
-    const handleUp = () => { setIsDragging(false); document.body.style.cursor = ''; };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    document.body.style.cursor = 'ew-resize';
-    return () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); document.body.style.cursor = ''; };
-  }, [isDragging, onChange, min, max]);
-
-  const onMouseDown = (e) => {
-    e.preventDefault(); setIsDragging(true);
-    startXRef.current = e.clientX; startValRef.current = Number(value);
-  };
-
-  return (
-    <span className={`${className} cursor-ew-resize select-none`} onMouseDown={onMouseDown}>{label}</span>
-  );
-};
-
 const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, onUpdateProfile, onBack }) => {
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -369,31 +340,53 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
         {/* Split Upload / Drop Zone */}
         {logoSettings?.src ? (
           <div className="flex flex-col gap-[1.25vw]">
-            <div className="flex items-center justify-between gap-[0.75vw]">
-              {/* Thumbnail Box */}
-              <div className="relative w-[5.5vw] h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] overflow-hidden group cursor-pointer bg-white flex items-center justify-center">
-                <img src={logoSettings.src} alt="Thumbnail" className="w-full h-full object-contain" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={(e) => { e.stopPropagation(); removeLogo(); }}>
-                 <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                 </div>
-                <div className="absolute right-[0.25vw] bottom-[0.25vw] bg-white/80 p-[0.125vw] rounded-[0.125vw] border border-gray-100">
+            {/* Current + Replace row */}
+            <div className="flex items-stretch gap-[0.75vw]">
+              {/* Current Logo */}
+              <div className="flex flex-col items-center gap-[0.35vw]">
+                <div className="relative w-[5.5vw] h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] overflow-hidden bg-white flex items-center justify-center group">
+                  <img src={logoSettings.src} alt="Thumbnail" className="w-full h-full object-contain" />
+                  {/* Hover overlay with trash icon */}
+                  <div
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-[0.2vw] cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); removeLogo(); }}
+                  >
+                    <Icon icon="lucide:trash-2" className="w-[1.1vw] h-[1.1vw] text-white" />
+                    <span className="text-[0.5vw] text-white font-semibold">Remove</span>
                   </div>
+                </div>
+                <span className="text-[0.6vw] font-semibold text-gray-400">Current</span>
+
               </div>
 
-              {/* Transform Icon */}
-              <div className="flex items-center justify-center">
-                 <Icon icon="qlementine-icons:replace-16" className="w-[1vw] h-[1vw] text-gray-400" />
+              {/* Arrow */}
+              <div className="flex items-center justify-center pb-[1vw] shrink-0">
+                <Icon icon="qlementine-icons:replace-16" className="w-[1.1vw] h-[1.1vw] text-gray-300" />
               </div>
 
               {/* Replacement Upload Box */}
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/10 transition-all bg-white"
-              >
-                <Icon icon="lucide:upload" className="w-[1vw] h-[1vw] text-blue-400 opacity-60 mb-[0.125vw]" />
-                <p className="text-[0.625vw] font-medium text-gray-500 text-center leading-tight">
-                  Drag & Drop or <span className="text-blue-500 font-semibold hover:underline">Upload</span>
-                </p>
+              <div className="flex flex-col items-center gap-[0.35vw] flex-1">
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-400', 'bg-indigo-50/20'); }}
+                  onDragLeave={(e) => { e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/20'); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/20');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                      handleFileChange({ target: { files: [file] } });
+                    }
+                  }}
+                  className="flex-1 w-full h-[5vw] border-[0.125vw] border-dashed border-gray-200 rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/10 transition-all bg-white"
+                >
+                  <Icon icon="lucide:upload-cloud" className="w-[1.2vw] h-[1.2vw] text-blue-400 opacity-70 mb-[0.15vw]" />
+                  <p className="text-[0.58vw] font-medium text-gray-500 text-center leading-snug px-[0.3vw]">
+                    Drag & Drop or{' '}
+                    <span className="text-blue-500 font-semibold">Upload</span>
+                  </p>
+                </div>
+                <span className="text-[0.6vw] font-semibold text-gray-400  ">Supported File Format : JPG, PNG</span>
               </div>
             </div>
 
@@ -411,7 +404,7 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
 
             <button 
               onClick={() => setShowGallery(true)}
-              className="relative w-full h-[3.5vw] bg-black rounded-[0.5vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
+              className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
             >
               {/* Background Images Overlay */}
               <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
@@ -428,20 +421,20 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
               {/* Dark Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
               
-              {/* Content */}
-              <div className="relative z-10 flex items-center gap-[0.75vw]">
-                  <Icon icon="lucide:images" className="w-[1.2vw] h-[1.2vw] text-white" />
-                <span className="text-[0.85vw] font-bold text-white tracking-wide">Image Gallery</span>
-              </div>
+            {/* Content */}
+                           <div className="relative z-10 flex items-center gap-[0.75vw]">
+                               <Icon icon="clarity:image-gallery-solid" className="w-[1vw] h-[1.2vw] text-white" />
+                             <span className="text-[0.95vw] font-semibold text-white ">Image Gallery</span>
+                           </div>
             </button>
 
             {/* Opacity Slider */}
-            <div className="space-y-[0.1vw] pt-[1vw] ">
-              <div className="flex items-center justify-between">
+            <div className="space-y-[0.5vw]">
+              <div className="flex items-center">
                 <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
-                <div className="h-[0.0325vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
+                <div className="h-[0.0925vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
               </div>
-              <div className="flex items-center gap-[0.vw]">
+              <div className="flex items-center justify-between">
                 <input 
                   type="range" 
                   min="0" 
@@ -453,105 +446,13 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
                     background: `linear-gradient(to right, #5551FF 0%, #5551FF ${logoSettings?.opacity ?? 100}%, #f3f4f6 ${logoSettings?.opacity ?? 100}%, #f3f4f6 100%)` 
                   }}
                 />
-                <div 
-                  className="w-[2.5vw] text-right cursor-ew-resize select-none text-[0.75vw] text-gray-700 font-semibold"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    const startX = e.clientX;
-                    const startVal = logoSettings?.opacity ?? 100;
-                    const handleMove = (moveEvent) => {
-                      const dx = moveEvent.clientX - startX;
-                      const newVal = Math.max(0, Math.min(100, startVal + Math.round(dx)));
-                      onUpdateLogo({ ...logoSettings, opacity: newVal });
-                    };
-                    const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-                    window.addEventListener('mousemove', handleMove);
-                    window.addEventListener('mouseup', handleUp);
-                  }}
-                >
+                <span className="w-[2vw] text-right text-[0.75vw] text-gray-700 font-semibold">
                   {logoSettings?.opacity ?? 100}%
-                </div>
+                </span>
               </div>
             </div>
 
-            {/* Adjustments Section */}
-            <div className="space-y-[0.5vw]">
-              <div className="flex items-center">
-                <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Adjustments</span>
-                <div className="h-[0.0925vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
-              </div>
 
-              <div className="space-y-[0.5vw]">
-                {[
-                  { label: 'Exposure', key: 'exposure', min: -100, max: 100 },
-                  { label: 'Contrast', key: 'contrast', min: -100, max: 100 },
-                  { label: 'Saturation', key: 'saturation', min: -100, max: 100 },
-                  { label: 'Temperature', key: 'temperature', min: -100, max: 100 },
-                  { label: 'Tint', key: 'tint', min: -180, max: 180 },
-                  { label: 'Highlights', key: 'highlights', min: -100, max: 100 },
-                  { label: 'Shadows', key: 'shadows', min: -100, max: 100 },
-                ].map((adj) => {
-                  const val = logoSettings?.adjustments?.[adj.key] || 0;
-                  const percentage = ((val - adj.min) / (adj.max - adj.min)) * 100;
-                  return (
-                    <div key={adj.key}>
-                      {/* Label + Reset + Value */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-[0.8vw]">
-                          <DraggableSpan 
-                            label={adj.label} 
-                            value={val} 
-                            onChange={(v) => handleAdjustmentChange(adj.key, v)}
-                            min={adj.min} 
-                            max={adj.max} 
-                            className="text-[0.75vw] font-semibold text-gray-700" 
-                          />
-                          <button 
-                            onClick={() => resetAdjustment(adj.key)}
-                            className="text-gray-300 hover:text-red-500 transition-colors"
-                            title={`Reset ${adj.label}`}
-                          >
-                            <Icon icon="ix:reset" className="w-[0.8vw] h-[0.8vw]" />
-                          </button>
-                        </div>
-                        <div 
-                          className="w-[2vw] text-right cursor-ew-resize select-none text-[0.75vw] text-gray-700 font-semibold"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const startX = e.clientX;
-                            const startVal = val;
-                            const handleMove = (moveEvent) => {
-                              const dx = moveEvent.clientX - startX;
-                              const newVal = Math.max(adj.min, Math.min(adj.max, startVal + Math.round(dx)));
-                              handleAdjustmentChange(adj.key, newVal);
-                            };
-                            const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-                            window.addEventListener('mousemove', handleMove);
-                            window.addEventListener('mouseup', handleUp);
-                          }}
-                        >
-                          {val}
-                        </div>
-                      </div>
-                      {/* Slider */}
-                      <div className="flex items-center">
-                        <input 
-                          type="range" 
-                          min={adj.min} 
-                          max={adj.max} 
-                          value={val} 
-                          onChange={(e) => handleAdjustmentChange(adj.key, parseInt(e.target.value))}
-                          className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
-                          style={{ 
-                            background: `linear-gradient(to right, #5551FF 0%, #5551FF ${percentage}%, #f3f4f6 ${percentage}%, #f3f4f6 100%)` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-[1vw]">
@@ -580,7 +481,7 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
             
            <button 
               onClick={() => setShowGallery(true)}
-              className="relative w-full h-[3.5vw] bg-black rounded-[0.5vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
+              className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
             >
               {/* Background Images Overlay */}
               <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
@@ -598,10 +499,10 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
               <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
               
               {/* Content */}
-              <div className="relative z-10 flex items-center gap-[0.75vw]">
-                  <Icon icon="lucide:images" className="w-[1.2vw] h-[1.2vw] text-white" />
-                <span className="text-[0.85vw] font-bold text-white tracking-wide">Image Gallery</span>
-              </div>
+                           <div className="relative z-10 flex items-center gap-[0.75vw]">
+                               <Icon icon="clarity:image-gallery-solid" className="w-[1vw] h-[1.2vw] text-white" />
+                             <span className="text-[0.95vw] font-semibold text-white ">Image Gallery</span>
+                           </div>
             </button>
           </div>
         )}
@@ -642,11 +543,11 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
                   handleModalFileUpload({ target: { files: [file] } });
                 }
               }}
-              className="w-full h-28 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition-all cursor-pointer group mb-2"
+              className="w-full h-28 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center bg-white hover:bg-gray-50 hover:border-indigo-500 transition-all cursor-pointer group mb-2"
             >
               <p className="text-[13px] text-gray-500 font-normal mb-3">Drag & Drop or <span className="text-blue-600 font-semibold">Upload</span></p>
-              <Icon icon="lucide:upload" className="w-8 h-8 text-gray-300 mb-2" />
-              <p className="text-[11px] text-gray-400 text-center">Supported File : <span className="font-medium">JPG, PNG, WEBP</span></p>
+              <Icon icon="lucide:upload" className="w-6 h-6 text-gray-300 mb-2 hover:border-indigo-500 transition-all cursor-pointer " />
+            <p className="text-[11px] text-gray-400 text-center">Supported File : <span className="font-medium">JPG, PNG</span></p>
             </div>
             <input type="file" ref={galleryInputRef} onChange={handleModalFileUpload} accept="image/*" className="hidden" />
           </div>

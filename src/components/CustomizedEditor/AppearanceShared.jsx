@@ -129,136 +129,18 @@ export const generateGradientString = (type, stops, angle = 0, radius = 100) => 
     }
 };
 
+import ColorPicker from './ColorPallet';
+
 export const CustomColorPicker = React.memo(({ color, onChange, onClose, position, opacity, onOpacityChange }) => {
-  const [hue, setHue] = useState(0);
-  const [sat, setSat] = useState(100);
-  const [bright, setBright] = useState(100);
-  const pickerRef = useRef(null);
-
-  useEffect(() => {
-    if (color && color.startsWith('#')) {
-      const rgbObj = hexToRgb(color);
-      const hsvObj = rgbToHsv(rgbObj.r, rgbObj.g, rgbObj.b);
-      setHue(hsvObj.h);
-      setSat(hsvObj.s);
-      setBright(hsvObj.v);
-    }
-  }, [color]);
-
-  const handleMouseDown = useCallback((e, type) => {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const moveHandler = (moveEvent) => {
-      if (type === 'sat-bright') {
-        const x = Math.max(0, Math.min(1, (moveEvent.clientX - rect.left) / rect.width));
-        const y = Math.max(0, Math.min(1, 1 - (moveEvent.clientY - rect.top) / rect.height));
-        updateColor(hue, x * 100, y * 100);
-      } else if (type === 'hue') {
-        const h = Math.max(0, Math.min(1, (moveEvent.clientY - rect.top) / rect.height));
-        updateColor(h * 360, sat, bright);
-      }
-    };
-    const upHandler = () => {
-      window.removeEventListener('mousemove', moveHandler);
-      window.removeEventListener('mouseup', upHandler);
-    };
-    window.addEventListener('mousemove', moveHandler);
-    window.addEventListener('mouseup', upHandler);
-  }, [hue, sat, bright]);
-
-  const updateColor = (h, s, v) => {
-    setHue(h);
-    setSat(s);
-    setBright(v);
-    const rgbObj = hsvToRgb(h, s, v);
-    const hexVal = rgbToHex(rgbObj.r, rgbObj.g, rgbObj.b);
-    onChange(hexVal);
-  };
-
-  const handleEyedropper = async () => {
-    if (!window.EyeDropper) return;
-    const eyeDropper = new window.EyeDropper();
-    try {
-      const result = await eyeDropper.open();
-      onChange(result.sRGBHex.toUpperCase());
-    } catch (e) {}
-  };
-
   return (
-    <div 
-      ref={pickerRef}
-      className="fixed z-[100] color-picker-popup bg-white rounded-[0.5vw] shadow-[0_1.25vw_3.125vw_rgba(0,0,0,0.15)] border border-gray-100 p-[0.75vw] w-[13.75vw] animate-in fade-in zoom-in-95 duration-200"
-      style={{ top: position.y, left: position.x }}
-    >
-      <div className="flex items-center justify-between mb-[1vw]">
-        <span className="text-[0.7875vw] font-semibold text-gray-800">Color Picker</span>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-          <X size="1vw" />
-        </button>
-      </div>
-      
-      <div className="flex gap-[0.5vw] mb-[1vw]">
-        <div 
-          className="flex-1 aspect-square rounded-[0.75vw] cursor-crosshair overflow-hidden relative"
-          style={{ backgroundColor: `hsl(${hue}, 100%, 50%)` }}
-          onMouseDown={(e) => handleMouseDown(e, 'sat-bright')}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-white to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-          <div 
-            className="absolute w-[1vw] h-[1vw] border-[0.125vw] border-white rounded-full shadow-lg -translate-x-1/2 translate-y-1/2 pointer-events-none"
-            style={{ left: `${sat}%`, bottom: `${bright}%` }}
-          />
-        </div>
-        <div 
-          className="w-[2.5vw] rounded-[0.75vw] cursor-pointer relative overflow-hidden"
-          style={{ background: 'linear-gradient(to bottom, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)' }}
-          onMouseDown={(e) => handleMouseDown(e, 'hue')}
-        >
-          <div 
-            className="absolute left-0 right-0 h-[0.375vw] border-y border-white bg-black/20 pointer-events-none"
-            style={{ top: `${(hue / 360) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-[1vw]">
-        <div className="flex items-center justify-between gap-[0.75vw]">
-          <span className="text-[0.625vw] font-semibold text-gray-500 ">Hex:</span>
-          <div className="flex-1 flex items-center border border-gray-200 rounded-[0.5vw] px-[0.5vw] py-[0.375vw] bg-gray-50">
-            <input 
-              type="text" 
-              value={color} 
-              onChange={(e) => onChange(e.target.value)}
-              className="w-full bg-transparent text-[0.75vw] font-bold text-gray-700 outline-none"
-            />
-            <button onClick={handleEyedropper} className="p-[0.25vw] hover:bg-gray-200 rounded-[0.25vw] transition-colors">
-              <Pipette size="0.875vw" className="text-gray-500" />
-            </button>
-          </div>
-        </div>
-
-        {onOpacityChange && (
-          <div className="space-y-[0.375vw]">
-            <div className="flex justify-between items-center">
-              <span className="text-[0.625vw] font-bold text-gray-500">Opacity:</span>
-              <span className="text-[0.625vw] font-bold text-gray-700">{opacity}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={opacity}
-              onChange={(e) => onOpacityChange(parseInt(e.target.value))}
-              className="w-full h-[0.375vw] rounded-[0.5vw] appearance-none cursor-pointer accent-indigo-600 bg-gray-100"
-              style={{
-                background: `linear-gradient(to right, transparent 0%, ${color} 100%)`
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+    <ColorPicker
+      color={color}
+      onChange={onChange}
+      onClose={onClose}
+      opacity={opacity}
+      onOpacityChange={onOpacityChange}
+      style={{ top: position?.y, left: position?.x, position: 'fixed' }}
+    />
   );
 });
 
