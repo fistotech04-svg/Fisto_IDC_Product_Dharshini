@@ -4,6 +4,7 @@ import { Type, Image as ImageIcon } from 'lucide-react';
 import { initSlideshowRunner } from './SlideshowRunner';
 import { initAnimationRunner } from './AnimationRunner';
 import * as BookAppearanceHelpers from '../CustomizedEditor/bookAppearanceHelpers';
+import { getCleanHTML } from '../../utils/editorUtils';
 
 const HTMLTemplateEditor = forwardRef(({
   templateHTML,
@@ -220,7 +221,7 @@ const HTMLTemplateEditor = forwardRef(({
           }, 0);
 
           // Trigger update
-          const html = doc.documentElement.outerHTML;
+          const html = getCleanHTML(doc);
           internalHtmlRefs.current[p.index] = html;
           if (onPageUpdate) onPageUpdate(p.index, html);
         }
@@ -327,8 +328,88 @@ const HTMLTemplateEditor = forwardRef(({
     if (onElementSelect) onElementSelect(null, null);
   }, [onElementSelect]);
 
+
   const setupEditableElements = (doc, pageIndex) => {
     if (!doc.body) return;
+
+    // Identify this style block so we can easily remove it later
+    if (!doc.getElementById('fisto-editor-styles')) {
+        const style = doc.createElement('style');
+        style.id = 'fisto-editor-styles';
+        style.textContent = `
+          html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+          *:focus { outline: 0.15vw solid #6366f1 !important; outline-offset: 0.1vw !important; }
+          [data-editable="true"]:hover { background-color: rgba(99, 102, 241, 0.05); }
+          [contenteditable]:hover { background-color: rgba(99, 102, 241, 0.05); cursor: text; }
+          [contenteditable]:focus { background-color: rgba(99, 102, 241, 0.08); }
+          [data-interaction-type="frame"] {
+            cursor: pointer;
+            border: 0.15vw dashed transparent;
+            background-color: transparent;
+            z-index: 100;
+            position: absolute;
+            pointer-events: auto;
+          }
+          [data-interaction-type="frame"]:hover {
+            background-color: rgba(0, 149, 255, 0.05) !important;
+            border: 0.1vw dashed rgba(0, 149, 255, 0.3) !important;
+          }
+          [data-interaction-type="frame"][data-selected="true"] {
+            border: 0.15vw dashed #0095FF !important;
+            background-color: rgba(0, 149, 255, 0.1) !important;
+            outline: none !important;
+            cursor: move !important;
+            z-index: 101;
+          }
+          .resize-handle { 
+            position: absolute; 
+            width: 0.6vw; 
+            height: 0.6vw; 
+            background: #6366f1; 
+            border: 0.05vw solid white; 
+            z-index: 10; 
+            pointer-events: auto;
+            display: none; 
+          }
+          [data-interaction-type="frame"][data-selected="true"] .resize-handle {
+            display: block;
+          }
+          .resize-n { top: -0.3vw; left: 50%; cursor: n-resize; transform: translateX(-50%); }
+          .resize-s { bottom: -0.3vw; left: 50%; cursor: s-resize; transform: translateX(-50%); }
+          .resize-e { right: -0.3vw; top: 50%; cursor: e-resize; transform: translateY(-50%); }
+          .resize-w { left: -0.3vw; top: 50%; cursor: w-resize; transform: translateY(-50%); }
+          .resize-nw { top: -0.3vw; left: -0.3vw; cursor: nw-resize; }
+          .resize-ne { top: -0.3vw; right: -0.3vw; cursor: ne-resize; }
+          .resize-sw { bottom: -0.3vw; left: -0.3vw; cursor: sw-resize; }
+          .resize-se { bottom: -0.3vw; right: -0.3vw; cursor: se-resize; }
+          [data-interaction-type="frame"]::after {
+            content: attr(data-interaction);
+            position: absolute;
+            top: 0.4vw;
+            left: 0.4vw;
+            background: rgba(99, 102, 241, 0.9);
+            color: white;
+            padding: 0.1vw 0.5vw;
+            border-radius: 0.3vw;
+            font-size: 0.6vw;
+            font-weight: 700;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 0.03vw;
+            box-shadow: 0 0.1vw 0.3vw rgba(0,0,0,0.1);
+            z-index: 100;
+            display: none;
+          }
+          [data-interaction-type="frame"][data-selected="true"]::after,
+          [data-interaction-type="frame"]:hover::after {
+             display: block;
+          }
+          [data-interaction="none"]::after {
+            display: none !important;
+          }
+        `;
+        doc.head.appendChild(style);
+    }
 
     const textElements = doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, a, li, td, th, label, div');
     const images = doc.querySelectorAll('img');
@@ -343,7 +424,6 @@ const HTMLTemplateEditor = forwardRef(({
       el.style.outline = 'none';
       
       el.addEventListener('focus', () => {
-        // Do NOT switch page context automatically to avoid re-renders
         deselectAll(); 
         el.style.outline = '2px solid #6366f1';
         el.style.outlineOffset = '2px';
@@ -351,14 +431,10 @@ const HTMLTemplateEditor = forwardRef(({
         if (onElementSelect) onElementSelect(el, 'text', pageIndex);
       });
       
-      el.addEventListener('blur', () => {
-         // Save history logic here if needed
-      });
-
       el.addEventListener('input', () => {
         if (debounceRefs.current[pageIndex]) clearTimeout(debounceRefs.current[pageIndex]);
         debounceRefs.current[pageIndex] = setTimeout(() => {
-              const html = doc.documentElement.outerHTML;
+              const html = getCleanHTML(doc);
               internalHtmlRefs.current[pageIndex] = html; 
               if (onPageUpdate) {
                   onPageUpdate(pageIndex, html);
@@ -690,7 +766,7 @@ const HTMLTemplateEditor = forwardRef(({
 
     const onMouseUp = () => {
       if (isDragging || isResizing) {
-        const html = doc.documentElement.outerHTML;
+        const html = getCleanHTML(doc);
         internalHtmlRefs.current[pageIndex] = html;
         if (onPageUpdate) onPageUpdate(pageIndex, html);
       }

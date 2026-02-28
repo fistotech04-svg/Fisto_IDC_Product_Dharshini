@@ -28,6 +28,7 @@ import useDeviceDetection from '../../hooks/useDeviceDetection';
 import useThumbnail from '../../hooks/useThumbnail';
 import useHistory from '../../hooks/useHistory';
 import usePreventBrowserZoom from '../../hooks/usePreventBrowserZoom';
+import { getCleanHTML } from '../../utils/editorUtils';
 
 const MainEditor = () => {
   // ==================== REFS ====================
@@ -1251,7 +1252,7 @@ const MainEditor = () => {
       const doc = targetElement.ownerDocument;
       
       if (doc && doc.documentElement) {
-        const html = doc.documentElement.outerHTML;
+        const html = getCleanHTML(doc);
         
         // Determine the correct page index for this element
         let targetPageIndex = selectedElementPage;
@@ -1309,7 +1310,7 @@ const MainEditor = () => {
 
   const handlePopupUpdate = useCallback(() => {
     if (activePopupElement?.ownerDocument?.documentElement) {
-      const newContent = activePopupElement.ownerDocument.documentElement.outerHTML;
+      const newContent = getCleanHTML(activePopupElement.ownerDocument);
       handlePopupPreviewUpdate({ content: newContent });
       if (selectedElement) {
         selectedElement.setAttribute('data-interaction-content', newContent);

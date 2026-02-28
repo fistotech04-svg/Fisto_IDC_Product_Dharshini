@@ -275,13 +275,15 @@ const getSlideshowScript = () => `
         });
       });
 
-      observer.observe(document.body, {
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-slideshow', 'data-is-slideshow', 'data-active-index']
-      });
-
+      let isInitialized = false;
       const initSlideshows = () => {
+         if (isInitialized || !document.body) return;
+         isInitialized = true;
+         observer.observe(document.body, {
+           subtree: true,
+           attributes: true,
+           attributeFilter: ['data-slideshow', 'data-is-slideshow', 'data-active-index']
+         });
          document.querySelectorAll('[data-slideshow]').forEach(el => {
             if (el.dataset.isSlideshow === 'true') setupSlideshow(el);
          });
@@ -352,7 +354,13 @@ const getAnimationScript = (pageNumber) => `
       };
 
       const runAnim = (el, type, settings) => {
-        if (!type || !WAAPI_ANIMATIONS[type] || type === 'none') return;
+        if (!type || !WAAPI_ANIMATIONS[type] || type === 'none') {
+            if (el.__currentAnimation) {
+                el.__currentAnimation.cancel();
+                el.__currentAnimation = null;
+            }
+            return;
+        }
         if (el.__currentAnimation) el.__currentAnimation.cancel();
 
         const duration = ((parseFloat(settings.duration) || 1) / (parseFloat(settings.speed) || 1)) * 1000;
@@ -375,74 +383,147 @@ const getAnimationScript = (pageNumber) => `
       };
 
       const handleTrigger = () => {
-        // While Opening
-        document.querySelectorAll('[data-animation-trigger="While Opening"]').forEach(el => {
-          const type = el.getAttribute('data-animation-open-type');
-          if (type && type !== 'none') {
-            const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
-            if (!everyVisit && el.__animOpened) return;
-            runAnim(el, type, {
-              duration: el.getAttribute('data-animation-open-duration'),
-              speed: el.getAttribute('data-animation-open-speed'),
-              delay: el.getAttribute('data-animation-open-delay'),
-              easing: el.getAttribute('data-animation-open-easing')
-            });
-            el.__animOpened = true;
-          }
-        });
+        document.querySelectorAll('[data-animation-trigger]').forEach(el => {
+            const trigger = el.getAttribute('data-animation-trigger');
+            
+            // 1. While Opening
+            if (trigger === 'While Opening') {
+                const type = el.getAttribute('data-animation-open-type');
+                if (type && type !== 'none') {
+                    const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
+                    const settingsStr = JSON.stringify({
+                       type,
+                       duration: el.getAttribute('data-animation-open-duration'),
+                       speed: el.getAttribute('data-animation-open-speed'),
+                       delay: el.getAttribute('data-animation-open-delay'),
+                       easing: el.getAttribute('data-animation-open-easing')
+                    });
 
-        // Always
-        document.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Always"]').forEach(el => {
-          const type = el.getAttribute('data-animation-interact-type');
-          if (type && type !== 'none') {
-            runAnim(el, type, {
-              duration: el.getAttribute('data-animation-interact-duration'),
-              speed: el.getAttribute('data-animation-interact-speed'),
-              delay: el.getAttribute('data-animation-interact-delay'),
-              easing: el.getAttribute('data-animation-interact-easing')
-            });
-          }
-        });
-
-        // Click
-        document.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Click"]').forEach(el => {
-          if (el.__clickBound) return;
-          el.__clickBound = true;
-          el.style.cursor = 'pointer';
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const type = el.getAttribute('data-animation-interact-type');
-            if (type && type !== 'none') {
-              runAnim(el, type, {
-                duration: el.getAttribute('data-animation-interact-duration'),
-                speed: el.getAttribute('data-animation-interact-speed'),
-                delay: el.getAttribute('data-animation-interact-delay'),
-                easing: el.getAttribute('data-animation-interact-easing')
-              });
+                    const hasChanged = el.__lastOpenSettings !== settingsStr;
+                    if (!everyVisit && el.__animOpened && !hasChanged) return;
+                    
+                    runAnim(el, type, {
+                      duration: el.getAttribute('data-animation-open-duration'),
+                      speed: el.getAttribute('data-animation-open-speed'),
+                      delay: el.getAttribute('data-animation-open-delay'),
+                      easing: el.getAttribute('data-animation-open-easing')
+                    });
+                    
+                    el.__animOpened = true;
+                    el.__lastOpenSettings = settingsStr;
+                } else {
+                    runAnim(el, 'none');
+                }
             }
-          });
-        });
+            
+            // 2. On Page - Always
+            else if (trigger === 'On Page' && el.getAttribute('data-animation-action') === 'Always') {
+                const type = el.getAttribute('data-animation-interact-type');
+                if (type && type !== 'none') {
+                    const settingsStr = JSON.stringify({
+                      type,
+                      duration: el.getAttribute('data-animation-interact-duration'),
+                      speed: el.getAttribute('data-animation-interact-speed'),
+                      delay: el.getAttribute('data-animation-interact-delay'),
+                      easing: el.getAttribute('data-animation-interact-easing')
+                    });
 
-        // Hover
-        document.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Hover"]').forEach(el => {
-          if (el.__hoverBound) return;
-          el.__hoverBound = true;
-          el.addEventListener('mouseenter', () => {
-            const type = el.getAttribute('data-animation-interact-type');
-            if (type && type !== 'none') {
-              runAnim(el, type, {
-                duration: el.getAttribute('data-animation-interact-duration'),
-                speed: el.getAttribute('data-animation-interact-speed'),
-                delay: el.getAttribute('data-animation-interact-delay'),
-                easing: el.getAttribute('data-animation-interact-easing')
-              });
+                    if (el.__lastAlwaysSettings === settingsStr) return;
+
+                    runAnim(el, type, {
+                      duration: el.getAttribute('data-animation-interact-duration'),
+                      speed: el.getAttribute('data-animation-interact-speed'),
+                      delay: el.getAttribute('data-animation-interact-delay'),
+                      easing: el.getAttribute('data-animation-interact-easing')
+                    });
+                    el.__lastAlwaysSettings = settingsStr;
+                } else {
+                    runAnim(el, 'none');
+                    el.__lastAlwaysSettings = null;
+                }
             }
-          });
+
+            // 3. On Page - Click/Hover
+            else if (trigger === 'On Page') {
+                const action = el.getAttribute('data-animation-action');
+                if (action === 'Click') {
+                    if (!el.__clickBound) {
+                        el.__clickBound = true;
+                        el.style.cursor = 'pointer';
+                        el.addEventListener('click', (e) => {
+                            if (el.getAttribute('data-animation-trigger') !== 'On Page' || el.getAttribute('data-animation-action') !== 'Click') return;
+                            e.stopPropagation();
+                            const type = el.getAttribute('data-animation-interact-type');
+                            runAnim(el, type, {
+                                duration: el.getAttribute('data-animation-interact-duration'),
+                                speed: el.getAttribute('data-animation-interact-speed'),
+                                delay: el.getAttribute('data-animation-interact-delay'),
+                                easing: el.getAttribute('data-animation-interact-easing')
+                            });
+                        });
+                    }
+                } else if (action === 'Hover') {
+                    if (!el.__hoverBound) {
+                        el.__hoverBound = true;
+                        el.addEventListener('mouseenter', () => {
+                            if (el.getAttribute('data-animation-trigger') !== 'On Page' || el.getAttribute('data-animation-action') !== 'Hover') return;
+                            const type = el.getAttribute('data-animation-interact-type');
+                            runAnim(el, type, {
+                                duration: el.getAttribute('data-animation-interact-duration'),
+                                speed: el.getAttribute('data-animation-interact-speed'),
+                                delay: el.getAttribute('data-animation-interact-delay'),
+                                easing: el.getAttribute('data-animation-interact-easing')
+                            });
+                        });
+                    }
+                }
+                if (el.__lastAlwaysSettings) {
+                    runAnim(el, 'none');
+                    el.__lastAlwaysSettings = null;
+                }
+            }
+            
+            else {
+                runAnim(el, 'none');
+                el.__lastAlwaysSettings = null;
+            }
         });
       };
 
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', handleTrigger);
-      else handleTrigger();
+      const observer = new MutationObserver((mutations) => {
+        let shouldTrigger = false;
+        mutations.forEach(m => {
+          if (m.type === 'attributes' && m.attributeName.startsWith('data-animation-')) shouldTrigger = true;
+          if (m.type === 'childList' && m.addedNodes.length > 0) shouldTrigger = true;
+        });
+        if (shouldTrigger) handleTrigger();
+      });
+
+      let isInitialized = false;
+      const initAnimations = () => {
+          if (isInitialized || !document.body) return;
+          isInitialized = true;
+          // console.log("Animation Script Initializing for Page", pageNumber);
+          observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+          handleTrigger();
+      };
+
+      window.addEventListener('message', (e) => {
+          if (e.data && e.data.type === 'RETRIGGER_ANIMATIONS') {
+              if (!isInitialized) initAnimations();
+              document.querySelectorAll('[data-animation-trigger="While Opening"]').forEach(el => {
+                  const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
+                  if (everyVisit) {
+                      el.__animOpened = false;
+                      el.__lastOpenSettings = null;
+                  }
+              });
+              handleTrigger();
+          }
+      });
+
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAnimations);
+      else initAnimations();
     })();
   </script>
 `;
@@ -488,26 +569,41 @@ const getInteractionScript = (pageNumber) => `
 `;
 
 const getIframeContent = (html, pageNumber) => {
-    // Inject scripts
-    const content = `
+    if (!html) return '';
+    
+    const scripts = `
+        <style>
+            body { margin: 0; padding: 0; overflow: hidden; background: white; width: 100%; height: 100%; }
+            * { box-sizing: border-box; }
+            ::-webkit-scrollbar { width: 0px; background: transparent; }
+        </style>
+        ${getSlideshowScript()}
+        ${getAnimationScript(pageNumber)}
+        ${getInteractionScript(pageNumber)}
+    `;
+
+    // If it's a full HTML document, inject scripts into <head>
+    if (html.toLowerCase().includes('<html') || html.toLowerCase().includes('<head')) {
+        if (html.toLowerCase().includes('</head>')) {
+            return html.replace(/<\/head>/i, `${scripts}</head>`);
+        } else if (html.toLowerCase().includes('<body')) {
+            return html.replace(/<body/i, `${scripts}<body`);
+        }
+        return scripts + html;
+    }
+
+    // Otherwise, wrap the snippet
+    return `
         <!DOCTYPE html>
         <html>
             <head>
-                <style>
-                    body { margin: 0; padding: 0; overflow: hidden; background: white; width: 100%; height: 100%; }
-                    * { box-sizing: border-box; }
-                    ::-webkit-scrollbar { width: 0px; background: transparent; }
-                </style>
-                ${getSlideshowScript()}
-                ${getAnimationScript(pageNumber)}
-                ${getInteractionScript(pageNumber)}
+                ${scripts}
             </head>
             <body>
-                ${html || ''}
+                ${html}
             </body>
         </html>
     `;
-    return content;
 };
 
 const PageItem = React.memo(({ html, index, cornerRadius }) => {
@@ -700,7 +796,8 @@ const PreviewArea = React.memo(({
     menuBarSettings,
     otherSetupSettings,
     hideHeader = false,
-    activeSubView
+    activeSubView,
+    onClose
 }) => {
     const settings = menuBarSettings || {
         navigation: { nextPrevButtons: true, mouseWheel: true, dragToTurn: true, pageQuickAccess: true, tableOfContents: true, pageThumbnails: true, bookmark: true, startEndNav: true },
@@ -782,6 +879,94 @@ const PreviewArea = React.memo(({
     }, [galleryImages.length]);
 
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [deviceMode, setDeviceMode] = useState('desktop'); // desktop, tablet, mobile
+    const [isDraggerExpanded, setIsDraggerExpanded] = useState(false);
+    const [draggerTabTop, setDraggerTabTop] = useState(150);
+    const [draggerTabLeft, setDraggerTabLeft] = useState(window.innerWidth - 60);
+    const [isDraggerDragging, setIsDraggerDragging] = useState(false);
+    const draggerHasMovedRef = useRef(false);
+    const draggerOffsetRef = useRef({ x: 0, y: 0 });
+
+    const deviceStyles = {
+        desktop: { width: '100%', height: '100%', borderRadius: '0', border: 'none', transition: 'all 0.5s ease' },
+        tablet: { width: '100%', height: '100%', maxWidth: '768px', maxHeight: '1024px', aspectRatio: '768/1024', borderRadius: '1.5rem', border: '16px solid #1f2937', transition: 'all 0.5s ease', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' },
+        mobile: { width: '100%', height: '100%', maxWidth: '375px', maxHeight: '812px', aspectRatio: '375/812', borderRadius: '2rem', border: '16px solid #1f2937', transition: 'all 0.5s ease', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' },
+    };
+
+    const handleDraggerMouseDown = (e) => {
+        setIsDraggerDragging(true);
+        draggerHasMovedRef.current = false;
+        
+        // Calculate offset so the dragger doesn't "jump" to cursor top-left
+        draggerOffsetRef.current = {
+            x: e.clientX - draggerTabLeft,
+            y: e.clientY - draggerTabTop
+        };
+        
+        e.preventDefault();
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isDraggerDragging) return;
+            draggerHasMovedRef.current = true;
+            
+            const newTop = e.clientY - draggerOffsetRef.current.y;
+            const newLeft = e.clientX - draggerOffsetRef.current.x;
+            
+            // Clamp within viewport
+            const paddedWidth = window.innerWidth - 60;
+            const paddedHeight = window.innerHeight - (isDraggerExpanded ? 300 : 60);
+            
+            setDraggerTabTop(Math.max(10, Math.min(newTop, paddedHeight)));
+            setDraggerTabLeft(Math.max(10, Math.min(newLeft, paddedWidth)));
+        };
+
+        const handleMouseUp = () => {
+            if (isDraggerDragging) {
+                setIsDraggerDragging(false);
+                if (!draggerHasMovedRef.current) {
+                    setIsDraggerExpanded(prev => !prev);
+                } else {
+                    // Snap to sides based on the center of the dragger
+                    const midPoint = window.innerWidth / 2;
+                    const draggerWidth = (window.innerWidth * 3.2) / 100; // 3.2vw in pixels
+                    const draggerCenter = draggerTabLeft + (draggerWidth / 2);
+                    
+                    if (draggerCenter < midPoint) {
+                        setDraggerTabLeft(0);
+                    } else {
+                        setDraggerTabLeft(window.innerWidth - draggerWidth);
+                    }
+                }
+            }
+        };
+
+        const handleResize = () => {
+            setDraggerTabLeft(prev => {
+                const draggerWidth = (window.innerWidth * 3.2) / 100;
+                // If it was stuck to the right, keep it stuck to the right
+                if (prev > window.innerWidth / 2) {
+                    return window.innerWidth - draggerWidth;
+                }
+                return 0; // Otherwise keep it on the left
+            });
+        };
+
+        if (isDraggerDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isDraggerDragging, isDraggerExpanded, draggerTabLeft]);
 
     const setIsPlaying = useCallback((val) => {
         setIsAutoFlipping(val);
@@ -1233,6 +1418,21 @@ const PreviewArea = React.memo(({
         }
     }, [targetPage, augmentedPages.length]);
 
+    // Broadcast animation re-trigger on page visible
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (containerRef.current) {
+                const iframes = containerRef.current.querySelectorAll('iframe');
+                iframes.forEach(iframe => {
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'RETRIGGER_ANIMATIONS' }, '*');
+                    }
+                });
+            }
+        }, 800); // Wait for flip animation to mostly complete
+        return () => clearTimeout(timer);
+    }, [currentPage]);
+
     return (
         <div
             ref={containerRef}
@@ -1543,8 +1743,108 @@ const PreviewArea = React.memo(({
                 </div>
             )}
 
+            {/* Draggable Device Settings (Sidebar-style Dragger) - Only visible in Preview Mode */}
+            {onClose && (
+                <>
+                    {/* Persistent vertical line on the stuck edge */}
+                    {!isDraggerDragging && (
+                        <div 
+                            className="fixed top-0 w-[0.25vw] h-full bg-black z-[1999] pointer-events-none transition-all duration-300"
+                            style={{ 
+                                left: draggerTabLeft < 10 ? '0' : 'auto',
+                                right: draggerTabLeft > 10 ? '0' : 'auto',
+                                opacity: 1
+                            }}
+                        />
+                    )}
+
+                    <div 
+                        className="fixed z-[2000] pointer-events-auto"
+                        style={{ 
+                            top: `${draggerTabTop}px`,
+                            left: isDraggerDragging ? `${draggerTabLeft}px` : (draggerTabLeft < 10 ? '0' : 'auto'),
+                            right: isDraggerDragging ? 'auto' : (draggerTabLeft < 10 ? 'auto' : '0')
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div 
+                            className={`bg-black text-white shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex flex-col items-center transition-all duration-300 overflow-hidden ${
+                                isDraggerDragging ? 'rounded-[0.8vw]' : (draggerTabLeft < 10 ? 'rounded-r-[0.8vw] rounded-l-none' : 'rounded-l-[0.8vw] rounded-r-none')
+                            }`}
+                            style={{ width: '3.2vw', height: isDraggerExpanded ? '14vw' : '3.2vw' }}
+                        >
+                        {/* Draggable Handle / Gear Icon */}
+                        <div
+                            onMouseDown={handleDraggerMouseDown}
+                            className={`w-[2.6vw] h-[2.6vw] mt-[0.3vw] flex items-center justify-center rounded-[0.5vw] cursor-grab transition-colors flex-shrink-0 ${
+                                isDraggerExpanded ? 'bg-white text-black' : 'bg-transparent text-white hover:bg-white/20'
+                            } ${isDraggerDragging ? 'cursor-grabbing scale-105' : ''}`}
+                            title="Toggle Device Preview Settings"
+                        >
+                            <Icon icon="lucide:settings" className="w-[1.4vw] h-[1.4vw]" />
+                        </div>
+
+                        {/* Expandable Options */}
+                        <div className={`flex flex-col gap-[0.8vw] mt-[0.8vw] w-full px-[0.4vw] transition-opacity duration-300 ${isDraggerExpanded ? 'opacity-100 delay-100' : 'opacity-0 pointer-events-none'}`}>
+                            
+                            {/* Device Selectors */}
+                            <div className="flex flex-col gap-[0.4vw] border border-white/30 rounded-[1.5vw] p-[0.3vw]">
+                                <button 
+                                    onClick={() => setDeviceMode('desktop')}
+                                    className={`w-[1.8vw] h-[1.8vw] mx-auto rounded-full flex items-center justify-center transition-colors ${deviceMode === 'desktop' ? 'bg-white text-black shadow-md' : 'text-white hover:bg-white/20'}`}
+                                    title="Desktop View"
+                                >
+                                    <Icon icon="lucide:monitor" className="w-[1vw] h-[1vw]" />
+                                </button>
+                                <button 
+                                    onClick={() => setDeviceMode('tablet')}
+                                    className={`w-[1.8vw] h-[1.8vw] mx-auto rounded-full flex items-center justify-center transition-colors ${deviceMode === 'tablet' ? 'bg-white text-black shadow-md' : 'text-white hover:bg-white/20'}`}
+                                    title="Tablet View"
+                                >
+                                    <Icon icon="lucide:tablet" className="w-[1vw] h-[1vw]" />
+                                </button>
+                                <button 
+                                    onClick={() => setDeviceMode('mobile')}
+                                    className={`w-[1.8vw] h-[1.8vw] mx-auto rounded-full flex items-center justify-center transition-colors ${deviceMode === 'mobile' ? 'bg-white text-black shadow-md' : 'text-white hover:bg-white/20'}`}
+                                    title="Mobile View"
+                                >
+                                    <Icon icon="lucide:smartphone" className="w-[1vw] h-[1vw]" />
+                                </button>
+                            </div>
+
+                            {/* Return/Exit action (Only in Preview Mode) */}
+                            {onClose && (
+                                <button 
+                                    className="w-[2.2vw] h-[2.2vw] rounded-[0.5vw] flex items-center justify-center mx-auto text-white hover:bg-gray-500/50 transition-colors border border-white/20"
+                                    title="Exit Preview"
+                                    onClick={onClose}
+                                >
+                                    <Icon 
+                                        icon="heroicons-outline:logout" 
+                                        className={`w-[1.1vw] h-[1.1vw] transition-transform duration-300 ${draggerTabLeft < 10 ? 'rotate-0' : 'rotate-180'}`} 
+                                    />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                </>
+            )}
+
             {/* Canvas Area - Added min-h-0 to allow shrinking in flex layout */}
             <div className="flex-1 min-h-0 flex items-center justify-center relative p-[2vw] z-[1]">
+                {/* Device Frame Wrapper */}
+                <div 
+                    className="relative flex items-center justify-center transition-all duration-500"
+                    style={{ 
+                        ...deviceStyles[deviceMode],
+                        backgroundColor: deviceMode === 'desktop' ? 'transparent' : 'white',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {deviceMode !== 'desktop' && (
+                        <div className="absolute top-[0.6rem] left-1/2 -translate-x-1/2 w-[60px] h-[6px] bg-[#1f2937] opacity-80 rounded-full z-[100] pointer-events-none"></div>
+                    )}
                 {/* Vertical Centered Navigation Arrows */}
                 {settings.navigation.nextPrevButtons && (
                     <>
@@ -1605,100 +1905,102 @@ const PreviewArea = React.memo(({
                     </div>
                 )}
 
-                {/* Right Floating Actions - Exact Screenshot Design Match - Compact Version */}
-                <div className="absolute right-[2.5vw] top-[3vw] flex flex-col gap-[0.8vw] z-20 items-end">
-                    {/* Interaction Button */}
-                    <div 
-                        className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group overflow-hidden border border-white/50"
-                        style={{ 
-                            backgroundColor: otherSetup.popup?.backgroundColor?.fill || '#F1F1F5',
-                            borderColor: otherSetup.popup?.backgroundColor?.stroke && otherSetup.popup.backgroundColor.stroke !== '#' ? otherSetup.popup.backgroundColor.stroke : 'white'
-                        }}
-                    >
-                        <div className="flex-shrink-0 w-[2.2vw] h-[2.2vw] flex items-center justify-center">
-                            <Icon 
-                                icon="ph:cursor-click-bold" 
-                                className="w-[1.6vw] h-[1.6vw] group-hover:scale-110 transition-transform" 
-                                style={{ 
-                                    color: otherSetup.popup?.iconsColor?.fill || '#1A1A1A',
-                                    filter: otherSetup.popup?.iconsColor?.stroke && otherSetup.popup.iconsColor.stroke !== '#' 
-                                        ? `drop-shadow(1px 0 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(-1px 0 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(0 1px 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(0 -1px 0 ${otherSetup.popup.iconsColor.stroke})` 
-                                        : 'none'
-                                }}
-                            />
-                        </div>
-                        <span 
-                            className="text-[0.72vw] font-medium leading-[1.1] select-none"
-                            style={{ 
-                                fontFamily: otherSetup.popup?.textProperties?.font || 'Poppins',
-                                color: otherSetup.popup?.textProperties?.fill || '#1A1A1A'
-                            }}
-                        >
-                            Click to View<br />Interaction
-                        </span>
-                    </div>
-
-                    {/* Bookmarks Button */}
-                    {settings.navigation.bookmark && (
-                        <div
-                            className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group relative overflow-hidden border border-white/50"
+                {/* Right Floating Actions - Only visible in Preview Mode */}
+                {onClose && (
+                    <div className="absolute right-[2.5vw] top-[3vw] flex flex-col gap-[0.8vw] z-20 items-end">
+                        {/* Interaction Button */}
+                        <div 
+                            className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group overflow-hidden border border-white/50"
                             style={{ 
                                 backgroundColor: otherSetup.popup?.backgroundColor?.fill || '#F1F1F5',
                                 borderColor: otherSetup.popup?.backgroundColor?.stroke && otherSetup.popup.backgroundColor.stroke !== '#' ? otherSetup.popup.backgroundColor.stroke : 'white'
                             }}
-                            onClick={(e) => { e.stopPropagation(); setShowAddBookmarkPopupMemo(true); }}
                         >
-                            <span 
-                                className="text-[0.72vw] font-medium leading-[1.1] select-none z-10"
-                                style={{ 
-                                    fontFamily: otherSetup.popup?.textProperties?.font || 'Poppins',
-                                    color: otherSetup.popup?.textProperties?.fill || '#1A1A1A'
-                                }}
-                            >
-                                Click to Add<br />Bookmarks
-                            </span>
-                            {/* Colored Emoji Bookmark Icon */}
-                            <div className="absolute top-[0.2vw] right-[0.2vw] w-[3.2vw] h-[3.2vw] group-hover:scale-110 transition-transform flex items-center justify-center pointer-events-none">
-                                <Icon icon="emojione:bookmark" className="w-[2.4vw] h-[2.4vw]" />
+                            <div className="flex-shrink-0 w-[2.2vw] h-[2.2vw] flex items-center justify-center">
+                                <Icon 
+                                    icon="ph:cursor-click-bold" 
+                                    className="w-[1.6vw] h-[1.6vw] group-hover:scale-110 transition-transform" 
+                                    style={{ 
+                                        color: otherSetup.popup?.iconsColor?.fill || '#1A1A1A',
+                                        filter: otherSetup.popup?.iconsColor?.stroke && otherSetup.popup.iconsColor.stroke !== '#' 
+                                            ? `drop-shadow(1px 0 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(-1px 0 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(0 1px 0 ${otherSetup.popup.iconsColor.stroke}) drop-shadow(0 -1px 0 ${otherSetup.popup.iconsColor.stroke})` 
+                                            : 'none'
+                                    }}
+                                />
                             </div>
-                        </div>
-                    )}
-
-                    {/* Notes Button */}
-                    {settings.interaction.notes && (
-                        <div
-                            className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group relative border border-white/50"
-                            style={{ 
-                                backgroundColor: otherSetup.popup?.backgroundColor?.fill || '#F1F1F5',
-                                borderColor: otherSetup.popup?.backgroundColor?.stroke && otherSetup.popup.backgroundColor.stroke !== '#' ? otherSetup.popup.backgroundColor.stroke : 'white'
-                            }}
-                            onClick={(e) => { e.stopPropagation(); setShowAddNotesPopupMemo(true); }}
-                        >
                             <span 
-                                className="text-[0.72vw] font-medium leading-[1.1] select-none z-10"
+                                className="text-[0.72vw] font-medium leading-[1.1] select-none"
                                 style={{ 
                                     fontFamily: otherSetup.popup?.textProperties?.font || 'Poppins',
                                     color: otherSetup.popup?.textProperties?.fill || '#1A1A1A'
                                 }}
                             >
-                                Click to Add<br />Notes
+                                Click to View<br />Interaction
                             </span>
-                            {/* Decorative Stacked Post-its - Styled as a Corner Sticker */}
-                            <div className="absolute top-[-0.6vw] right-[-0.6vw] w-[3.5vw] h-[3.5vw] group-hover:scale-110 transition-transform pointer-events-none z-20">
-                                <div className="relative w-full h-full">
-                                    {/* Yellow Card */}
-                                    <div className="absolute top-[0.4vw] right-[1vw] w-[1.8vw] h-[1.8vw] bg-[#E5D731] rounded-[0.2vw] shadow-sm rotate-[12deg]" />
-                                    {/* Red Card */}
-                                    <div className="absolute top-[0.2vw] right-[0.6vw] w-[1.8vw] h-[1.8vw] bg-[#D4223A] rounded-[0.2vw] shadow-sm rotate-[-5deg]" />
-                                    {/* Blue Card */}
-                                    <div className="absolute top-[0.6vw] right-[0.2vw] w-[1.8vw] h-[1.8vw] bg-[#1D62D0] rounded-[0.2vw] shadow-lg flex items-center justify-center text-center p-[0.1vw]">
-                                        <span className="text-[0.28vw] text-white font-semibold leading-tight">Click to<br />Add<br />Notes</span>
+                        </div>
+
+                        {/* Bookmarks Button */}
+                        {settings.navigation.bookmark && (
+                            <div
+                                className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group relative overflow-hidden border border-white/50"
+                                style={{ 
+                                    backgroundColor: otherSetup.popup?.backgroundColor?.fill || '#F1F1F5',
+                                    borderColor: otherSetup.popup?.backgroundColor?.stroke && otherSetup.popup.backgroundColor.stroke !== '#' ? otherSetup.popup.backgroundColor.stroke : 'white'
+                                }}
+                                onClick={(e) => { e.stopPropagation(); setShowAddBookmarkPopupMemo(true); }}
+                            >
+                                <span 
+                                    className="text-[0.72vw] font-medium leading-[1.1] select-none z-10"
+                                    style={{ 
+                                        fontFamily: otherSetup.popup?.textProperties?.font || 'Poppins',
+                                        color: otherSetup.popup?.textProperties?.fill || '#1A1A1A'
+                                    }}
+                                >
+                                    Click to Add<br />Bookmarks
+                                </span>
+                                {/* Colored Emoji Bookmark Icon */}
+                                <div className="absolute top-[0.2vw] right-[0.2vw] w-[3.2vw] h-[3.2vw] group-hover:scale-110 transition-transform flex items-center justify-center pointer-events-none">
+                                    <Icon icon="emojione:bookmark" className="w-[2.4vw] h-[2.4vw]" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Notes Button */}
+                        {settings.interaction.notes && (
+                            <div
+                                className="w-[8.5vw] h-[3.4vw] rounded-[0.8vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.1)] flex items-center p-[0.6vw] gap-[0.5vw] cursor-pointer hover:brightness-105 transition-all group relative border border-white/50"
+                                style={{ 
+                                    backgroundColor: otherSetup.popup?.backgroundColor?.fill || '#F1F1F5',
+                                    borderColor: otherSetup.popup?.backgroundColor?.stroke && otherSetup.popup.backgroundColor.stroke !== '#' ? otherSetup.popup.backgroundColor.stroke : 'white'
+                                }}
+                                onClick={(e) => { e.stopPropagation(); setShowAddNotesPopupMemo(true); }}
+                            >
+                                <span 
+                                    className="text-[0.72vw] font-medium leading-[1.1] select-none z-10"
+                                    style={{ 
+                                        fontFamily: otherSetup.popup?.textProperties?.font || 'Poppins',
+                                        color: otherSetup.popup?.textProperties?.fill || '#1A1A1A'
+                                    }}
+                                >
+                                    Click to Add<br />Notes
+                                </span>
+                                {/* Decorative Stacked Post-its - Styled as a Corner Sticker */}
+                                <div className="absolute top-[-0.6vw] right-[-0.6vw] w-[3.5vw] h-[3.5vw] group-hover:scale-110 transition-transform pointer-events-none z-20">
+                                    <div className="relative w-full h-full">
+                                        {/* Yellow Card */}
+                                        <div className="absolute top-[0.4vw] right-[1vw] w-[1.8vw] h-[1.8vw] bg-[#E5D731] rounded-[0.2vw] shadow-sm rotate-[12deg]" />
+                                        {/* Red Card */}
+                                        <div className="absolute top-[0.2vw] right-[0.6vw] w-[1.8vw] h-[1.8vw] bg-[#D4223A] rounded-[0.2vw] shadow-sm rotate-[-5deg]" />
+                                        {/* Blue Card */}
+                                        <div className="absolute top-[0.6vw] right-[0.2vw] w-[1.8vw] h-[1.8vw] bg-[#1D62D0] rounded-[0.2vw] shadow-lg flex items-center justify-center text-center p-[0.1vw]">
+                                            <span className="text-[0.28vw] text-white font-semibold leading-tight">Click to<br />Add<br />Notes</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Flipbook Container Wrapper */}
                 <div
@@ -1754,6 +2056,7 @@ const PreviewArea = React.memo(({
                     )}
                 </div>
             </div>
+        </div>
 
             {/* Popup Menus - Positioned specifically above toolbar icons */}
             {showBookmarkMenu && (

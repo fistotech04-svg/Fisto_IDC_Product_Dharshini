@@ -29,7 +29,7 @@
   opacity: 0;
   pointer-events: none;
 }
- 
+
 video.hide-controls:hover::-webkit-media-controls {
   opacity: 1;
   pointer-events: auto;
@@ -37,12 +37,36 @@ video.hide-controls:hover::-webkit-media-controls {
 }
 
 /* Hide Spin Buttons for Number Input */
-.no-spin::-webkit-inner-spin-button, 
-.no-spin::-webkit-outer-spin-button { 
-  -webkit-appearance: none; 
-  margin: 0; 
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .no-spin {
   -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Custom Range Slider Thumb */
+input[type="range"].slider-custom::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  background: #5551FF;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #5551FF, 0 1px 3px rgba(0,0,0,0.2);
+}
+
+input[type="range"].slider-custom::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  background: #5551FF;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #5551FF, 0 1px 3px rgba(0,0,0,0.2);
 }

@@ -280,11 +280,11 @@ const AnimationSection = React.memo(({
         </div>
       )}
       
-      <div className="flex gap-[1vw] items-start">
+      <div className="flex gap-[1vw] pt-[1vw] items-start">
         {/* Style Preview Card */}
         <div 
           onClick={(e) => onPreview(e, settings.type, settings)}
-          className="anim-panel-preview-card w-[5vw] h-[6.5vw] relative group rounded-[0.8vw] overflow-hidden border border-gray-200 bg-white shadow-[0_0.05vw_0.4vw_rgba(0,0,0,0.04)] hover:shadow-xs transition-all duration-300 flex-shrink-0 flex flex-col cursor-pointer"
+          className="anim-panel-preview-card w-[5.8vw] h-[7vw]  relative group rounded-[0.8vw] overflow-hidden border border-gray-200 bg-white shadow-[0_0.05vw_0.4vw_rgba(0,0,0,0.04)] hover:shadow-xs transition-all duration-300 flex-shrink-0 flex flex-col cursor-pointer"
         >
           {/* Top Section: Graphic & Replace Button */}
           <div className="flex-1 relative w-full flex items-center justify-center">
@@ -595,12 +595,13 @@ const AnimationPanel = ({ selectedElement, onUpdate, isOpen: externalIsOpen, onT
     if (e) e.stopPropagation();
     if (!selectedElement) return;
 
-    // 1. Remove all animation attributes from the DOM element
+    // 1. Remove ALL data-animation- attributes
     const attributes = selectedElement.attributes;
     const toRemove = [];
     for (let i = 0; i < attributes.length; i++) {
-        if (attributes[i].name.startsWith('data-animation-')) {
-            toRemove.push(attributes[i].name);
+        const name = attributes[i].name;
+        if (name.startsWith('data-animation-')) {
+            toRemove.push(name);
         }
     }
     toRemove.forEach(attr => selectedElement.removeAttribute(attr));
@@ -611,18 +612,17 @@ const AnimationPanel = ({ selectedElement, onUpdate, isOpen: externalIsOpen, onT
     selectedElement.style.filter = '';
     selectedElement.style.backdropFilter = '';
 
-    // 3. Reset local states to defaults
-    setMainType('While Opening');
-    setActionType('Click');
-    
-    const defaultSettings = { 
-      type: 'none', delay: 0, duration: 1, speed: 1, easing: 'Linear', 
-      everyVisit: true, fadeStart: true, fadeStartEnd: true, fadeEnd: true 
+    // 3. Reset local states to complete defaults
+    const defaultSettings = {
+      type: 'none', delay: 0, duration: 1, speed: 1, easing: 'Linear',
+      everyVisit: true, fadeStart: true, fadeStartEnd: true, fadeEnd: true
     };
-    
+
     setOpenSettings(defaultSettings);
     setCloseSettings(defaultSettings);
     setInteractSettings(defaultSettings);
+    setMainType('While Opening');
+    setActionType('Click');
 
     // 4. Notify parent of the change
     if (onUpdate) onUpdate();

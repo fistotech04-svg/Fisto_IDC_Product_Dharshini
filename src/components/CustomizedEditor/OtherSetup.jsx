@@ -901,7 +901,7 @@ const OtherSetup = ({ onBack, settings, onUpdate, folderName, bookName }) => {
             
             {/* Library Access Button */}
               <button 
-                           onClick={() => setShowGallery(true)}
+                onClick={() => setShowLibrary(true)}
                            className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
                          >
                            {/* Background Images Overlay */}

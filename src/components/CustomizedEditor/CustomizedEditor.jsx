@@ -11,6 +11,7 @@ import LeadForm from './LeadForm';
 import Visibility from './Visibility';
 import Statistic from './Statistic';
 import FlipbookPreview from '../TemplateEditor/FlipbookPreview';
+import { getCleanHTML } from '../../utils/editorUtils';
 // Navbar removed
 
 const CustomizedEditor = () => {
@@ -18,8 +19,14 @@ const CustomizedEditor = () => {
   const { setExportHandler, setSaveHandler, setPreviewHandler, setHasUnsavedChanges, triggerSaveSuccess, isAutoSaveEnabled, setCurrentBook } = useOutletContext() || {};
   const [bookName, setBookName] = useState('Name of the Book');
   const [activeSubView, setActiveSubView] = useState(null);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [pages, setPages] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Reset collapsed state whenever a new sub-view is selected
+  useEffect(() => {
+    setIsPanelCollapsed(false);
+  }, [activeSubView]);
 
   // Navbar States handled by context
   const [saveSuccessInfo, setSaveSuccessInfo] = useState(null);
@@ -461,12 +468,15 @@ const CustomizedEditor = () => {
             setBookName(res.data.name || 'Name of the Book');
             if (res.data.pages) {
               console.log('CustomizedEditor: Loading', res.data.pages.length, 'pages');
-              setPages(res.data.pages.map((p, i) => ({
-                id: p.id || i,
-                content: p.content || p.html || '',
-                name: p.name || `Page ${i + 1}`,
-                html: p.html || p.content || ''
-              })));
+              setPages(res.data.pages.map((p, i) => {
+                const rawHTML = p.html || p.content || '';
+                return {
+                  id: p.id || i,
+                  content: getCleanHTML(rawHTML),
+                  name: p.name || `Page ${i + 1}`,
+                  html: getCleanHTML(rawHTML)
+                };
+              }));
             }
             // Load settings if available
             if (res.data.settings) {
@@ -524,13 +534,14 @@ const CustomizedEditor = () => {
 
 
   const renderDetailContent = () => {
+    const handleBack = () => setIsPanelCollapsed(true);
     switch (activeSubView) {
       case 'logo':
       case 'profile':
         return (
           <Branding
             type={activeSubView}
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             logoSettings={logoSettings}
             onUpdateLogo={setLogoSettings}
             profileSettings={profileSettings}
@@ -543,7 +554,7 @@ const CustomizedEditor = () => {
         return (
           <Appearance
             activeSub={activeSubView}
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             backgroundSettings={backgroundSettings}
             onUpdateBackground={setBackgroundSettings}
             bookAppearanceSettings={bookAppearanceSettings}
@@ -553,7 +564,7 @@ const CustomizedEditor = () => {
       case 'menubar':
         return (
           <MenuBar
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             settings={menuBarSettings}
             onUpdate={setMenuBarSettings}
           />
@@ -561,7 +572,7 @@ const CustomizedEditor = () => {
       case 'othersetup':
         return (
           <OtherSetup
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             settings={otherSetupSettings}
             onUpdate={setOtherSetupSettings}
             folderName={folder}
@@ -571,7 +582,7 @@ const CustomizedEditor = () => {
       case 'leadform':
         return (
           <LeadForm
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             settings={leadFormSettings}
             onUpdate={setLeadFormSettings}
             pages={pages}
@@ -580,13 +591,13 @@ const CustomizedEditor = () => {
       case 'visibility':
         return (
           <Visibility
-            onBack={() => setActiveSubView(null)}
+            onBack={handleBack}
             settings={visibilitySettings}
             onUpdate={setVisibilitySettings}
           />
         );
       case 'statistic':
-        return <Statistic onBack={() => setActiveSubView(null)} />;
+        return <Statistic onBack={handleBack} />;
       default:
         return null;
     }
@@ -609,12 +620,14 @@ const CustomizedEditor = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Sidebar - Always Visible */}
-        <div className="w-[16.25vw] h-full flex-shrink-0 bg-white shadow-xl z-20 relative border-r border-gray-100">
+        <div className="w-[16.25vw] h-full flex-shrink-0 bg-white shadow-xl z-20 relative border-r border-gray-100 overflow-visible">
           <Sidebar
             bookName={bookName}
             setBookName={setBookName}
             activeSubView={activeSubView}
             setActiveSubView={setActiveSubView}
+            isPanelCollapsed={isPanelCollapsed}
+            setIsPanelCollapsed={setIsPanelCollapsed}
             pageCount={pages.length}
             visibilitySettings={visibilitySettings}
             onUpdateVisibility={setVisibilitySettings}
@@ -624,10 +637,11 @@ const CustomizedEditor = () => {
 
         {/* Sub-side Panel (Detail View) - Opens next to Main Sidebar */}
         <div
-          className={`h-full bg-white shadow-lg z-10 border-r border-gray-100 transition-all duration-300 ease-in-out flex-shrink-0 ${activeSubView
-            ? 'w-[21.25vw] opacity-100 translate-x-0 overflow-visible'
-            : 'w-0 opacity-0 -translate-x-full pointer-events-none overflow-hidden'
-            }`}
+          className={`h-full bg-white shadow-lg z-10 border-r border-gray-100 transition-all duration-300 ease-in-out flex-shrink-0 ${
+            activeSubView && !isPanelCollapsed
+              ? 'w-[21.25vw] opacity-100 translate-x-0 overflow-visible'
+              : 'w-0 opacity-0 -translate-x-full pointer-events-none overflow-hidden'
+          }`}
         >
           <div className="w-[21.25vw] h-full flex flex-col overflow-visible">
             {activeSubView && renderDetailContent()}

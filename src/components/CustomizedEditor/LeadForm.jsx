@@ -274,22 +274,8 @@ const ColorPickerItem = ({ label, color, onChange }) => {
     const pickerRef = useRef(null);
     const swatchRef = useRef(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (pickerRef.current && !pickerRef.current.contains(event.target) && 
-                swatchRef.current && !swatchRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
+    // The click-outside logic is now handled internally by ColorPallet via onClose
 
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
 
     const handleOpen = () => {
         if (!isOpen && swatchRef.current) {
@@ -306,7 +292,7 @@ const ColorPickerItem = ({ label, color, onChange }) => {
             <div className="flex-1 flex items-center gap-[0.5vw]">
                 <div 
                     ref={swatchRef}
-                    className="w-[2.2vw] h-[1.8vw] rounded-[0.4vw] border border-gray-300 cursor-pointer overflow-hidden relative shadow-sm"
+                    className="w-[1.8vw] h-[1.8vw] rounded-[0.4vw] border border-gray-900 cursor-pointer overflow-hidden relative shadow-sm color-picker-trigger"
                     style={{ backgroundColor: color === '#' || !color || color === 'transparent' ? 'white' : color }}
                     onClick={handleOpen}
                 >
@@ -314,7 +300,7 @@ const ColorPickerItem = ({ label, color, onChange }) => {
                          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[0.1vw] bg-red-500 rotate-45"></div>
                     )}
                 </div>
-                <div className="flex-1 flex items-center bg-white border border-gray-100 rounded-[0.4vw] px-[0.6vw] py-[0.2vw] h-[1.8vw] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                <div className="flex-1 flex items-center bg-white border border-gray-900 rounded-[0.4vw] px-[0.6vw] py-[0.2vw] h-[1.8vw] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
                     <span className="text-[0.7vw] font-medium text-gray-600 flex-1">{color && color.length > 1 ? color.toUpperCase() : '#'}</span>
                     <div className="w-[1px] h-[70%] bg-gray-100 mx-[0.4vw]"></div>
                     <div className="text-[0.75vw] font-semibold text-gray-800 w-[2.5vw] text-right">100%</div>

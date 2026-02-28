@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '@iconify/react';
-import { X, Pipette } from 'lucide-react';
+import { X, Pipette, Trash2, Plus, ChevronDown, RefreshCw, RotateCcw } from 'lucide-react';
+import PremiumDropdown from './PremiumDropdown';
 
 // Helper Functions
 export const rgbToHex = (r, g, b) => {
@@ -55,7 +56,6 @@ export const hsvToRgb = (h, s, v) => {
     case 3: r = p; g = q; b = v; break;
     case 4: r = t; g = p; b = v; break;
     case 5: r = v; g = p; b = q; break;
-    case 6: r = v; g = p; b = q; break; // Corrected case 6 to match logical flow if needed, though i%6 is 0-5
   }
   // Ensure we cover all cases or use default
   // The original code handled 0-5. 'h * 6' logic usually produces 0-6 range?
@@ -143,6 +143,49 @@ export const CustomColorPicker = React.memo(({ color, onChange, onClose, positio
     />
   );
 });
+
+export const SectionLabel = ({ label }) => (
+  <div className="flex items-center gap-[0.3vw] mb-[1.25vw] ">
+    <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">{label}</span>
+    <div className="h-[0.1vw] flex-grow bg-gray-100 "></div>
+  </div>
+);
+
+export const AdjustmentSlider = ({ label, value, onChange, onReset, min = -100, max = 100, unit = "", color = "#5551FF" }) => {
+  const percentage = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="flex flex-col pt-[0.1vw] py-[0.1vw] pl-[1vw] pr-[1vw]">
+      <div className="flex items-center justify-between px-[0.1vw]">
+        <div className="flex items-center gap-[0.5vw]">
+          <span className="text-[0.75vw] font-semibold text-gray-700 ">{label}</span>
+          <button 
+            onClick={onReset || (() => onChange(0))}
+            className="text-gray-400 hover:text-indigo-600 transition-colors"
+            title="Reset"
+          >
+            <Icon icon="ix:reset" className="w-[1.1vw] h-[1.1vw]" />
+          </button>
+        </div>
+        <span className="text-[0.75vw] font-semibold text-gray-700">
+          {value}{unit}
+        </span>
+      </div>
+      <div className="relative flex items-center h-[1.2vw]">
+        <input 
+          type="range" 
+          min={min} 
+          max={max} 
+          value={value} 
+          onChange={(e) => onChange(parseInt(e.target.value))}
+          className="w-full h-[0.25vw] bg-[#f8fafc] rounded-full appearance-none cursor-pointer slider-custom"
+          style={{ 
+            background: `linear-gradient(to right, ${color} 0%, ${color} ${percentage}%, #f1f5f9 ${percentage}%, #f1f5f9 100%)` 
+          }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export const EffectControlRow = ({ label, value, onChange, min = -100, max = 100 }) => {
   const [isDragging, setIsDragging] = useState(false);

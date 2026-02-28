@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
-import { ArrowLeftRight, Minus } from 'lucide-react';
+import { ArrowLeftRight, Minus, RefreshCw, ChevronDown, X, Check } from 'lucide-react';
 import backgroundComponents from './Backgrounds';
 import animationComponents from './Animations';
 import PremiumDropdown from './PremiumDropdown';
@@ -9,7 +9,9 @@ import {
   hexToRgb,
   generateGradientString,
   getColorAtOffset,
-  CustomColorPicker
+  CustomColorPicker,
+  AdjustmentSlider,
+  SectionLabel
 } from './AppearanceShared';
 const BackgroundSection = ({ 
   backgroundSettings, 
@@ -17,11 +19,44 @@ const BackgroundSection = ({
 }) => {
   const [activeTab, setActiveTab] = useState('Background');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showAdjustments, setShowAdjustments] = useState(false);
   const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
   const [showGallery, setShowGallery] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [localGallerySelected, setLocalGallerySelected] = useState(null);
+  const galleryInputRef = useRef(null);
+
+  // Load gallery images from localStorage on mount
+  useEffect(() => {
+    const savedImages = localStorage.getItem('customized_editor_gallery');
+    if (savedImages) {
+      try {
+        setUploadedImages(JSON.parse(savedImages));
+      } catch (e) {
+        console.error("Failed to load gallery images", e);
+      }
+    }
+  }, []);
+
+  // Save gallery images to localStorage when updated
+  useEffect(() => {
+    if (uploadedImages.length > 0) {
+      localStorage.setItem('customized_editor_gallery', JSON.stringify(uploadedImages));
+    }
+  }, [uploadedImages]);
+
+  const handleModalFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const newImageData = { id: Date.now(), url: event.target.result };
+      setUploadedImages((prev) => [newImageData, ...prev]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
      if (backgroundSettings?.style === 'ReactBits' && backgroundSettings.reactBitType) {
@@ -56,27 +91,6 @@ const BackgroundSection = ({
   const [pendingNewStopOffset, setPendingNewStopOffset] = useState(null);
 
   const fileInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
-  
-  // Load gallery images from localStorage on mount
-  useEffect(() => {
-    const savedImages = localStorage.getItem('customized_editor_gallery');
-    if (savedImages) {
-      try {
-        setUploadedImages(JSON.parse(savedImages));
-      } catch (e) {
-        console.error("Failed to load gallery images", e);
-      }
-    }
-  }, []);
-
-  // Save gallery images to localStorage when updated
-  useEffect(() => {
-    if (uploadedImages.length > 0) {
-      localStorage.setItem('customized_editor_gallery', JSON.stringify(uploadedImages));
-    }
-  }, [uploadedImages]);
-
   const bgStyle = (backgroundSettings?.style === 'ReactBits' || !backgroundSettings?.style) ? 'Solid' : backgroundSettings.style;
 
   useEffect(() => {
@@ -193,18 +207,6 @@ const BackgroundSection = ({
     setEditingGradientStopIndex(index);
   };
 
-  const handleModalFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const newImageData = { id: Date.now(), url: event.target.result };
-      setUploadedImages((prev) => [newImageData, ...prev]);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
   const setBgStyle = (style) => {
     setSelectedTheme(null);
     if (style === 'Gradient' && backgroundSettings.gradientStops) {
@@ -227,6 +229,31 @@ const BackgroundSection = ({
     onUpdateBackground({ ...backgroundSettings, style: 'Solid', color });
   };
 
+  const handleAdjustmentChange = (key, value) => {
+    onUpdateBackground({
+      ...backgroundSettings,
+      adjustments: {
+        ...(backgroundSettings?.adjustments || {}),
+        [key]: value
+      }
+    });
+  };
+
+  const resetAllAdjustments = () => {
+    onUpdateBackground({
+      ...backgroundSettings,
+      adjustments: {
+        exposure: 0,
+        contrast: 0,
+        saturation: 0,
+        temperature: 0,
+        tint: 0,
+        highlights: 0,
+        shadows: 0
+      }
+    });
+  };
+
   return (
     <div className="p-[1vw] flex flex-col">
       {/* Tabs */}
@@ -247,7 +274,7 @@ const BackgroundSection = ({
       </div>
 
       {activeTab === 'Background' && (
-        <>
+        <div className="flex flex-col gap-[1vw]">
           <div className="flex items-center gap-[3.5vw] mb-[0.5vw]">
             <PremiumDropdown 
               options={['Solid', 'Gradient', 'Image']}
@@ -292,9 +319,9 @@ const BackgroundSection = ({
             )}
           </div>
 
-          {bgStyle === 'Solid' ? (
-            <>
-              <div className="mb-[2vw]">
+          {bgStyle === 'Solid' && (
+            <div className="flex flex-col gap-[1.5vw]">
+              <div className="mb-[0.5vw]">
                 <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw]">
                   <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Pick Colors From Pallet</span>
                   <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
@@ -320,7 +347,7 @@ const BackgroundSection = ({
                 </div>
               </div>
 
-              <div className="mb-[1.5vw]">
+              <div className="mb-[0.5vw]">
                 <div className="flex items-center gap-[1vw] mb-[1.25vw]">
                   <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Solid Colors</span>
                   <div className="h-[1px] bg-gray-200 flex-1 mt-[0.2vw]"></div>
@@ -337,8 +364,10 @@ const BackgroundSection = ({
                   ))}
                 </div>
               </div>
-            </>
-          ) : bgStyle === 'Gradient' ? (
+            </div>
+          )}
+
+          {bgStyle === 'Gradient' && (
             <div className="space-y-[1.5vw] pt-[1vw]">
               <div>
                 <div className="flex items-center gap-[0.75vw] mb-[2vw]">
@@ -435,7 +464,7 @@ const BackgroundSection = ({
                       {(backgroundSettings.gradientStops || []).map((stop, idx) => (
                         <div
                           key={idx}
-                          className="absolute -translate-x-1/2 flex flex-col items-center group pointer-events-auto cursor-grab active:cursor-grabbing"
+                          className="absolute -translate-x-1/2 flex flex-col items-center group pointer-events-auto cursor-grab active:cursor-grabbing color-picker-trigger"
                           style={{ left: `${stop.offset}%`, bottom: '0.5vw' }}
                           onMouseDown={(e) => {
                             e.stopPropagation();
@@ -443,6 +472,8 @@ const BackgroundSection = ({
                             const startOffset = stop.offset;
                             let hasDragged = false;
                             const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            const currentTargetElement = e.currentTarget;
+                            
                             const handleMouseMove = (moveEvent) => {
                               const deltaX = moveEvent.clientX - startX;
                               if (Math.abs(deltaX) > 3) {
@@ -456,8 +487,8 @@ const BackgroundSection = ({
                               window.removeEventListener('mousemove', handleMouseMove);
                               window.removeEventListener('mouseup', handleMouseUp);
                               if (!hasDragged) {
-                                const pickRect = e.currentTarget.getBoundingClientRect();
-                                setPickerPos({ x: pickRect.left - 100, y: pickRect.top - 100 });
+                                const pickRect = currentTargetElement.getBoundingClientRect();
+                                setPickerPos({ x: pickRect.left - 120, y: pickRect.top - 100 });
                                 openGradientStopPicker(idx);
                               }
                             };
@@ -494,7 +525,7 @@ const BackgroundSection = ({
 
                 <div className="space-y-[0.75vw]">
                   {(backgroundSettings.gradientStops || []).map((stop, idx) => (
-                    <div key={idx} className="flex items-center gap-[0.75vw]">
+                    <div key={idx} className="flex items-center gap-[0.75vw] color-picker-trigger">
                       <div 
                         className="w-[2.25vw] h-[2.25vw] rounded-[0.5vw] border border-gray-200 shadow-sm cursor-pointer hover:border-indigo-400 transition-colors" 
                         style={{ backgroundColor: stop.color }}
@@ -504,7 +535,14 @@ const BackgroundSection = ({
                           openGradientStopPicker(idx);
                         }}
                       />
-                      <div className="flex-1 h-[2.25vw] border border-gray-600 rounded-[0.5vw] flex items-center px-[0.75vw] justify-between bg-white">
+                      <div 
+                        className="flex-1 h-[2.25vw] border border-gray-600 rounded-[0.5vw] flex items-center px-[0.75vw] justify-between bg-white cursor-pointer hover:border-indigo-400 transition-colors"
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPickerPos({ x: rect.left - 280, y: rect.top - 100 });
+                          openGradientStopPicker(idx);
+                        }}
+                      >
                         <span className="text-[0.85vw] font-medium text-gray-700 font-mono">{stop.color.toUpperCase()}</span>
                         <span className="text-[0.85vw] font-medium text-gray-700">{stop.opacity || 100}%</span>
                       </div>
@@ -549,8 +587,10 @@ const BackgroundSection = ({
                 </div>
               </div>
             </div>
-          ) : (
-            <div>
+          )}
+
+          {bgStyle === 'Image' && (
+            <div className="flex flex-col gap-[1vw]">
               <div className="mb-[0.5vw]">
                 <div className="flex items-center gap-[1vw] mb-[1.25vw] pt-[1vw]">
                   <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Upload Image</span>
@@ -663,35 +703,77 @@ const BackgroundSection = ({
                            </div>
                             </button>
               </div>
-
-              {backgroundSettings.image && (
-                <div className="space-y-[0.5vw] pt-[1.5vw]">
-                  <div className="flex items-center">
-                    <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
-                    <div className="h-[0.0925vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <input 
-                      type="range" 
-                      min="0" max="100" 
-                      value={backgroundSettings.opacity} 
-                      onChange={(e) => onUpdateBackground({ ...backgroundSettings, opacity: parseInt(e.target.value) })}
-                      className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
-                      style={{ 
-                        background: `linear-gradient(to right, #5551FF 0%, #5551FF ${backgroundSettings.opacity}%, #f3f4f6 ${backgroundSettings.opacity}%, #f3f4f6 100%)` 
-                      }}
-                    />
-                    <span className="w-[2vw] text-right text-[0.75vw] text-gray-700 font-semibold">
-                      {backgroundSettings.opacity}%
-                    </span>
-                  </div>
-                </div>
-              )}
-
-
             </div>
           )}
-        </>
+
+          {/* Opacity Slider and Adjustments - Only show for Image */}
+          {backgroundSettings.image && (
+            <>
+              <div className="">
+                <SectionLabel 
+                label="Opacity"
+                />
+                <AdjustmentSlider 
+                  value={backgroundSettings.opacity} 
+                  onChange={(val) => onUpdateBackground({ ...backgroundSettings, opacity: val })} 
+                  onReset={() => onUpdateBackground({ ...backgroundSettings, opacity: 100 })}
+                  min={0}
+                  max={100}
+                  unit="%"
+                />
+              </div>
+
+              {/* Adjustment Section */}
+              <div className=" space-y-[0.3vw]">
+                <SectionLabel label="Adjustments" />
+                <div className="space-y-[0.1vw]">
+                  <AdjustmentSlider 
+                    label="Exposure" 
+                    value={backgroundSettings?.adjustments?.exposure || 0} 
+                    onChange={(val) => handleAdjustmentChange('exposure', val)} 
+                    onReset={() => handleAdjustmentChange('exposure', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Contrast" 
+                    value={backgroundSettings?.adjustments?.contrast || 0} 
+                    onChange={(val) => handleAdjustmentChange('contrast', val)} 
+                    onReset={() => handleAdjustmentChange('contrast', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Saturation" 
+                    value={backgroundSettings?.adjustments?.saturation || 0} 
+                    onChange={(val) => handleAdjustmentChange('saturation', val)} 
+                    onReset={() => handleAdjustmentChange('saturation', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Temperature" 
+                    value={backgroundSettings?.adjustments?.temperature || 0} 
+                    onChange={(val) => handleAdjustmentChange('temperature', val)} 
+                    onReset={() => handleAdjustmentChange('temperature', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Tint" 
+                    value={backgroundSettings?.adjustments?.tint || 0} 
+                    onChange={(val) => handleAdjustmentChange('tint', val)} 
+                    onReset={() => handleAdjustmentChange('tint', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Highlights" 
+                    value={backgroundSettings?.adjustments?.highlights || 0} 
+                    onChange={(val) => handleAdjustmentChange('highlights', val)} 
+                    onReset={() => handleAdjustmentChange('highlights', 0)}
+                  />
+                  <AdjustmentSlider 
+                    label="Shadows" 
+                    value={backgroundSettings?.adjustments?.shadows || 0} 
+                    onChange={(val) => handleAdjustmentChange('shadows', val)} 
+                    onReset={() => handleAdjustmentChange('shadows', 0)}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {activeTab === 'Themes' && (
@@ -849,6 +931,84 @@ const BackgroundSection = ({
           onClose={() => setEditingGradientStopIndex(null)}
           position={pickerPos}
         />
+      )}
+
+      {/* Image Gallery Pop-up */}
+      {showGallery && (
+        <div className="fixed z-[1000] bg-white border border-gray-100 rounded-[0.8vw] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" 
+             style={{ width: '320px', height: '540px', top: '50%', left: '24vw', transform: 'translate(-50%, -50%)' }}>
+          <div className="flex items-center justify-between px-[1vw] py-[1vw] border-b border-gray-100">
+            <h2 className="text-[1vw] font-semibold text-gray-900">Image Gallery</h2>
+            <button onClick={() => setShowGallery(false)} className="w-[1.8vw] h-[1.8vw] flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
+              <X className="w-[1.2vw] h-[1.2vw] text-gray-400" />
+            </button>
+          </div>
+
+          <div className="px-[1vw] py-[0.5vw]">
+            <h3 className="text-[0.85vw] font-semibold text-gray-900 mb-[0.2vw]">Upload your Image</h3>
+            <p className="text-[0.7vw] text-gray-400 mb-[1vw]">
+              <span>You Can Reuse The File Which Is Uploaded In Gallery</span>
+              <span className="text-red-500">*</span>
+            </p>
+            <div
+              onClick={() => galleryInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                  handleModalFileUpload({ target: { files: [file] } });
+                }
+              }}
+              className="w-full h-[6vw] border-[0.15vw] border-dashed border-gray-300 rounded-[0.8vw] flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition-all cursor-pointer group mb-[0.5vw]"
+            >
+              <p className="text-[0.8vw] text-gray-500 font-normal mb-[0.6vw]">Drag & Drop or <span className="text-indigo-600 font-semibold">Upload</span></p>
+              <Icon icon="lucide:upload" className="w-[1.5vw] h-[1.5vw] text-gray-300 mb-[0.4vw]" />
+              <p className="text-[0.65vw] text-gray-400 text-center">Supported File : <span className="font-medium">JPG, PNG, WEBP</span></p>
+            </div>
+            <input type="file" ref={galleryInputRef} onChange={handleModalFileUpload} accept="image/*" className="hidden" />
+          </div>
+
+          <div className="custom-scrollbar overflow-y-auto px-[1vw] py-[0.5vw] flex-1">
+            <h3 className="text-[0.85vw] font-semibold text-gray-900 mb-[0.5vw]">Uploaded Images</h3>
+            {uploadedImages.length > 0 ? (
+              <div className="grid grid-cols-3 gap-[0.5vw]">
+                {uploadedImages.map((img, index) => (
+                  <div key={img.id || index} className="group cursor-pointer flex flex-col items-center" onClick={() => setLocalGallerySelected(img)}>
+                    <div className={`aspect-square w-full rounded-[0.5vw] overflow-hidden border-[0.15vw] transition-all ${localGallerySelected?.id === img.id ? 'border-indigo-600 shadow-md scale-[1.02]' : 'hover:border-indigo-400 border-gray-100'}`}>
+                      <img src={img.url} className="w-full h-full object-cover" alt="" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-[2vw] text-gray-400">
+                <p className="text-[0.8vw]">No uploaded images yet</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-[0.75vw] border-t flex justify-end gap-[0.5vw] bg-white mt-auto">
+            <button 
+              onClick={() => { setShowGallery(false); setLocalGallerySelected(null); }} 
+              className="flex-1 h-[2vw] border border-gray-300 rounded-[0.5vw] text-[0.7vw] font-semibold flex items-center justify-center gap-[0.3vw] hover:bg-gray-50"
+            >
+              <X size="0.9vw" /> Close
+            </button>
+            <button
+              onClick={() => {
+                if (localGallerySelected) {
+                  onUpdateBackground({ ...backgroundSettings, image: localGallerySelected.url });
+                  setShowGallery(false);
+                }
+              }}
+              disabled={!localGallerySelected}
+              className={`flex-1 h-[2vw] rounded-[0.5vw] text-[0.7vw] font-semibold flex items-center justify-center gap-[0.3vw] transition-all ${localGallerySelected ? 'bg-black text-white hover:bg-zinc-800' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+            >
+              <Check size="0.9vw" /> Place
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,8 +4,8 @@ import PremiumDropdown from './PremiumDropdown';
 import * as BookAppearanceHelpers from './bookAppearanceHelpers';
 import { 
   CustomColorPicker, 
-  EffectControlRow, 
-  DraggableSpan 
+  AdjustmentSlider, 
+  SectionLabel 
 } from './AppearanceShared';
 
 const BookAppearanceSection = ({ 
@@ -19,10 +19,7 @@ const BookAppearanceSection = ({
     <div className="p-[1vw]">
       {/* Book Paper Texture */}
       <div className="space-y-[1vw]">
-        <div className="flex items-center mb-[0.2vw]">
-          <h3 className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Book Paper Texture</h3>
-          <div className="h-[1px] bg-gray-200 flex-grow mt-[0.2vw]"></div>
-        </div>
+        <SectionLabel label="Book Paper Texture" />
         <p className="text-[0.6vw] text-gray-400 font-regular leading-relaxed mb-[0.5vw]">
           The chosen paper texture will be applied to every page of the flipbook.
         </p>
@@ -81,101 +78,28 @@ const BookAppearanceSection = ({
       </div>
 
       {/* Sliders Section */}
-      <div className="space-y-[0.5vw] pb-[0.8vw] pt-[0.8vw] pl-[0.3vw]">
+      <div className="space-y-[0.4vw] pb-[0.8vw] pt-[0.8vw]">
         {[
           { label: 'Grain Intensity', key: 'grainIntensity', min: -100, max: 100 },
           { label: 'Warmth', key: 'warmth', min: -100, max: 100 },
           { label: 'Texture Scale', key: 'textureScale', min: -50, max: 50 },
-          { label: 'Opacity', key: 'opacity', min: 0, max: 100 }
-        ].map((item) => {
-          let val = bookAppearanceSettings?.[item.key] ?? (item.key === 'opacity' ? 100 : 0);
-          
-          return (
-            <div key={item.key} className="space-y-[0.1vw] ">
-              <div className="flex items-center">
-                <DraggableSpan 
-                  label={item.label} 
-                  value={val} 
-                  onChange={(v) => onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: v})}
-                  min={item.min} 
-                  max={item.max} 
-                  className="text-[0.75vw] font-semibold text-gray-700" 
-                />
-                <Icon 
-                  icon="ix:reset" 
-                  className="w-[0.9vw] h-[0.9vw] text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" 
-                  onClick={() => onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: item.key === 'opacity' ? 100 : 0})} 
-                />
-              </div>
-              
-              <div className="flex items-center gap-[0.5vw]">
-                <div className="flex-1 relative h-[0.8vw] flex items-center">
-                  <input
-                    type="range"
-                    min={item.min}
-                    max={item.max}
-                    value={val}
-                    onChange={(e) => onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: parseInt(e.target.value)})}
-                    className={`w-full h-[0.4vw] rounded-full appearance-none cursor-pointer accent-[#5551FF] z-10 bg-transparent`}
-                  />
-                  <div 
-                    className="absolute inset-x-0 h-[0.2vw] rounded-full -z-0"
-                    style={{ 
-                      background: item.key === 'warmth' 
-                        ? 'linear-gradient(to right, #4387f5ff 0%, #E5E7EB 50%, #FFE4B5 100%)' 
-                        : '#E5E7EB'
-                    }}
-                  >
-                    { (item.key === 'opacity') && (
-                       <div 
-                         className="h-full bg-[#5551FF] rounded-full" 
-                         style={{ 
-                           width: `${((val - item.min) / (item.max - item.min)) * 100}%` 
-                         }} 
-                       />
-                    )}
-                    {(item.key !== 'opacity' && item.key !== 'warmth') && (
-                      <div 
-                        className="absolute top-0 bottom-0 bg-[#5551FF] rounded-full" 
-                        style={{ 
-                          left: val >= 0 ? '50%' : `${50 - (Math.abs(val) / item.max * 50)}%`, 
-                          width: `${(Math.abs(val) / item.max * 50)}%` 
-                        }} 
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <div 
-                    className="w-[2.5vw] h-[1.2vw] flex items-center justify-between pl-[0.5vw]  cursor-ew-resize select-none text-[0.75vw] font-semibold text-gray-700"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const startX = e.clientX;
-                      const startVal = val;
-                      const handleMove = (moveEvent) => {
-                        const dx = moveEvent.clientX - startX;
-                        const newVal = Math.max(item.min, Math.min(item.max, startVal + Math.round(dx)));
-                        onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: newVal});
-                      };
-                      const handleUp = () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('mouseup', handleUp); };
-                      window.addEventListener('mousemove', handleMove);
-                      window.addEventListener('mouseup', handleUp);
-                    }}
-                  >
-                    {val}{item.key === 'opacity' ? '%' : ''}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+          { label: 'Opacity', key: 'opacity', min: 0, max: 100, unit: '%' }
+        ].map((item) => (
+          <AdjustmentSlider 
+            key={item.key}
+            label={item.label}
+            value={bookAppearanceSettings?.[item.key] ?? (item.key === 'opacity' ? 100 : 0)}
+            onChange={(v) => onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: v})}
+            onReset={() => onUpdateBookAppearance({...bookAppearanceSettings, [item.key]: item.key === 'opacity' ? 100 : 0})}
+            min={item.min}
+            max={item.max}
+            unit={item.unit || ""}
+          />
+        ))}
       </div>
 
-      <div className="space-y-[0.75vw]">
-        <div className="flex items-center gap-[1vw] ">
-          <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Page Flipping Styles</span>
-          <div className="h-[1px] bg-gray-200 flex-grow mt-[0.2vw]"></div>
-        </div>
+      <div className="space-y-[0.75vw] mt-[1vw]">
+        <SectionLabel label="Page Flipping Styles" />
         <div className="flex items-center justify-between mt-[1vw] pl-[0.5vw] ">
           <span className="text-[0.75vw] font-semibold text-gray-700">Flip Style :</span>
           <PremiumDropdown
@@ -198,15 +122,12 @@ const BookAppearanceSection = ({
         </div>
       </div>
 
-      <div className="space-y-[0.75vw]">
-        <div className="flex items-center gap-[1vw]">
-          <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Book Corner Radius</span>
-          <div className="h-[1px] bg-gray-200 flex-grow mt-[0.2vw]"></div>
-        </div>
-        <div className="flex items-center justify-between mt-[1vw] pl-[0.5vw] pb-[1vw]">
-          <div className="flex items-center gap-[0.5vw]">
-            <Icon icon="material-symbols:rounded-corner" className="w-[1vw] h-[1vw] text-gray-400" />
-            <span className="text-[0.75vw] font-semibold text-gray-700">Corner Radius :</span>
+      <div className="space-y-[0.75vw] mt-[1.5vw]">
+        <SectionLabel label="Book Corner Radius" />
+        <div className="flex items-center justify-between pb-[1vw]">
+          <div className="flex items-center gap-[0.75vw] text-gray-600 pl-[0.2vw]">
+            <Icon icon="material-symbols:rounded-corner" className="w-[1.2vw] h-[1.2vw]" />
+            <span className="text-[0.85vw] font-bold text-[#1a1c3d]">Corner Radius :</span>
           </div>
           <PremiumDropdown
             options={['Sharp', 'Soft', 'Round']}
@@ -218,48 +139,79 @@ const BookAppearanceSection = ({
         </div>
       </div>
 
-      <div className="space-y-[0.75vw]">
-        <div className="flex items-center gap-[1vw]">
-          <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Drop Shadow</span>
-          <div className="h-[1px] bg-gray-200 flex-grow mt-[0.2vw]"></div>
-        </div>
-        <div className="flex items-center gap-[0.75vw]">
+      <div className="space-y-[0.75vw] mt-[1vw]">
+        <SectionLabel label="Drop Shadow" />
+        <div className="flex items-start gap-[1.25vw] pl-[0.2vw] py-[0.5vw]">
+          {/* Shadow Preview Box */}
           <div
-            className="w-[4vw] h-[4vw] bg-gray-800 rounded-[0.5vw] flex items-center justify-center text-white/50 text-[0.6vw] cursor-pointer"
-            style={{ background: `linear-gradient(135deg, ${bookAppearanceSettings?.dropShadow?.color || '#000'}, transparent)` }}
+            className="w-[5.5vw] h-[5.5vw] rounded-[0.5vw] flex items-center justify-center text-white text-[0.85vw] font-bold cursor-pointer transition-transform hover:scale-105"
+            style={{ 
+              background: `linear-gradient(to bottom, ${bookAppearanceSettings?.dropShadow?.color || '#000000'} 0%, transparent 100%)`,
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0'
+            }}
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              setShadowPickerPos({ x: rect.left - 100, y: rect.top - 100 });
+              setShadowPickerPos({ x: rect.left - 200, y: rect.top - 100 });
               setShowShadowColorPicker(true);
             }}
           >
-            {bookAppearanceSettings?.dropShadow?.opacity || 0}%
+            {bookAppearanceSettings?.dropShadow?.opacity || 0} %
           </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between px-2 py-1 border rounded bg-gray-50">
-               <span className="text-[0.7vw] font-mono">{bookAppearanceSettings?.dropShadow?.color || '#000000'}</span>
-               <Icon icon="mdi:pipette-varian" className="w-3 h-3 text-gray-400" />
+          
+          <div className="flex-1 space-y-[1.2vw]">
+            {/* Hex Code Input */}
+            <div className="flex items-center justify-between">
+              <span className="text-[0.85vw] font-bold text-[#1a1c3d]">Code :</span>
+              <div 
+                className="flex items-center justify-between w-[10vw] px-[0.75vw] py-[0.5vw] border border-gray-200 rounded-[0.5vw] bg-white cursor-pointer hover:border-blue-400 transition-colors"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setShadowPickerPos({ x: rect.left - 200, y: rect.top - 100 });
+                  setShowShadowColorPicker(true);
+                }}
+              >
+                <span className="text-[0.85vw] font-mono text-gray-500 uppercase tracking-tighter">
+                  {bookAppearanceSettings?.dropShadow?.color || '#000000'}
+                </span>
+                <Icon icon="mdi:pipette" className="w-[1.1vw] h-[1.1vw] text-gray-400" />
+              </div>
             </div>
-            <input
-              type="range"
-              min="0" max="100"
-              value={bookAppearanceSettings?.dropShadow?.opacity || 0}
-              onChange={(e) => onUpdateBookAppearance({ ...bookAppearanceSettings, dropShadow: { ...bookAppearanceSettings.dropShadow, opacity: parseInt(e.target.value) } })}
-              className="w-full h-1 accent-[#5551FF]"
-            />
+
+            {/* Opacity Row */}
+            <div className="flex items-center justify-between gap-[0.5vw]">
+               <span className="text-[0.85vw] font-bold text-[#1a1c3d] whitespace-nowrap">Opacity :</span>
+               <div className="flex-1 flex items-center gap-[0.75vw]">
+                  <input
+                    type="range"
+                    min="0" max="100"
+                    value={bookAppearanceSettings?.dropShadow?.opacity || 0}
+                    onChange={(e) => onUpdateBookAppearance({ ...bookAppearanceSettings, dropShadow: { ...bookAppearanceSettings.dropShadow, opacity: parseInt(e.target.value) } })}
+                    className="flex-1 h-[0.35vw] bg-[#f1f5f9] rounded-full appearance-none cursor-pointer slider-custom"
+                    style={{ 
+                      background: `linear-gradient(to right, #5551FF 0%, #5551FF ${bookAppearanceSettings?.dropShadow?.opacity || 0}%, #f1f5f9 ${bookAppearanceSettings?.dropShadow?.opacity || 0}%, #f1f5f9 100%)` 
+                    }}
+                  />
+                  <span className="text-[0.85vw] font-bold text-[#1a1c3d] w-[2.2vw] text-right">
+                    {bookAppearanceSettings?.dropShadow?.opacity || 0} %
+                  </span>
+               </div>
+            </div>
           </div>
         </div>
         
-        <div className="space-y-1">
+        {/* Additional Shadow Controls */}
+        <div className="space-y-[0.1vw] mt-[0.5vw]">
           {['X Axis', 'Y Axis', 'Blur %', 'Spread'].map((label, idx) => {
             const keys = ['xAxis', 'yAxis', 'blur', 'spread'];
             const key = keys[idx];
             return (
-              <EffectControlRow
+              <AdjustmentSlider
                 key={key}
                 label={label}
                 value={bookAppearanceSettings?.dropShadow?.[key] || 0}
                 onChange={(v) => onUpdateBookAppearance({ ...bookAppearanceSettings, dropShadow: { ...bookAppearanceSettings.dropShadow, [key]: v } })}
+                onReset={() => onUpdateBookAppearance({ ...bookAppearanceSettings, dropShadow: { ...bookAppearanceSettings.dropShadow, [key]: 0 } })}
                 min={key === 'spread' ? -20 : -50} 
                 max={50}
               />
@@ -268,11 +220,8 @@ const BookAppearanceSection = ({
         </div>
       </div>
 
-      <div className="space-y-[1.2vw] pt-[1vw]">
-        <div className="flex items-center gap-[1vw]">
-          <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Flipbook Instructions</span>
-          <div className="h-[1px] bg-gray-200 flex-grow mt-[0.2vw]"></div>
-        </div>
+      <div className="space-y-[1.2vw] mt-[1.5vw]">
+        <SectionLabel label="Flipbook Instructions" />
         <div className="space-y-[1vw] pl-[0.5vw] ">
           {['first', 'every'].map((type) => (
             <label key={type} className="flex items-center gap-[0.8vw] cursor-pointer">

@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
-import { Trash2, Plus, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, RefreshCw } from 'lucide-react';
 import PremiumDropdown from './PremiumDropdown';
+import { AdjustmentSlider, SectionLabel } from './AppearanceShared';
 
 const fontFamilies = [
   'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
@@ -92,6 +93,21 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
 
   const resetAdjustment = (key) => {
     handleAdjustmentChange(key, 0);
+  };
+
+  const resetAllAdjustments = () => {
+    onUpdateLogo({
+      ...logoSettings,
+      adjustments: {
+        exposure: 0,
+        contrast: 0,
+        saturation: 0,
+        temperature: 0,
+        tint: 0,
+        highlights: 0,
+        shadows: 0
+      }
+    });
   };
 
   const handleModalFileUpload = (e) => {
@@ -402,53 +418,66 @@ const Branding = ({ type = 'logo', logoSettings, onUpdateLogo, profileSettings, 
           />
         </div>
 
-            <button 
-              onClick={() => setShowGallery(true)}
-              className="relative w-full h-[3.5vw] bg-black rounded-[0.9vw] overflow-hidden group transition-all hover:scale-[1.01] active:scale-[0.98] shadow-lg flex items-center justify-center border border-white/5"
-            >
-              {/* Background Images Overlay */}
-              <div className="absolute inset-0 flex gap-[0.5vw] opacity-20 group-hover:opacity-40 transition-opacity">
-                <div className="flex-1 bg-cover bg-center" 
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1493612276216-ee3925520721?q=80&w=300&auto=format&fit=crop')" }}>
-                </div>
-                <div className="flex-1 bg-cover bg-center" 
-                 style={{ backgroundImage: "url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=300&auto=format&fit=crop')" }}>
-                </div>
-                <div className="flex-1 bg-cover bg-center" 
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=300&auto=format&fit=crop')" }}>
-                </div>
-              </div>
-              {/* Dark Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-gray/10 via-gray/20 to-gray/40 group-hover:via-gray/20 transition-all"></div>
-              
-            {/* Content */}
-                           <div className="relative z-10 flex items-center gap-[0.75vw]">
-                               <Icon icon="clarity:image-gallery-solid" className="w-[1vw] h-[1.2vw] text-white" />
-                             <span className="text-[0.95vw] font-semibold text-white ">Image Gallery</span>
-                           </div>
-            </button>
 
             {/* Opacity Slider */}
-            <div className="space-y-[0.5vw]">
-              <div className="flex items-center">
-                <span className="text-[0.85vw] font-semibold text-gray-900 whitespace-nowrap">Opacity</span>
-                <div className="h-[0.0925vw] flex-grow bg-gray-200 ml-[0.5vw]"></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  value={logoSettings?.opacity ?? 100} 
-                  onChange={(e) => onUpdateLogo({ ...logoSettings, opacity: parseInt(e.target.value) })}
-                  className="flex-1 h-[0.2vw] bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#5551FF]"
-                  style={{ 
-                    background: `linear-gradient(to right, #5551FF 0%, #5551FF ${logoSettings?.opacity ?? 100}%, #f3f4f6 ${logoSettings?.opacity ?? 100}%, #f3f4f6 100%)` 
-                  }}
+            <div className="mb-[1vw]">
+              <AdjustmentSlider 
+                label="Opacity" 
+                value={logoSettings?.opacity ?? 100} 
+                onChange={(val) => onUpdateLogo({ ...logoSettings, opacity: val })} 
+                onReset={() => onUpdateLogo({ ...logoSettings, opacity: 100 })}
+                min={0}
+                max={100}
+                unit="%"
+              />
+            </div>
+
+            {/* Adjustment Section */}
+            <div className="space-y-[0.3vw]">
+              <SectionLabel label="Adjustments" />
+              <div className="space-y-[0.1vw]">
+                <AdjustmentSlider 
+                  label="Exposure" 
+                  value={logoSettings?.adjustments?.exposure || 0} 
+                  onChange={(val) => handleAdjustmentChange('exposure', val)} 
+                  unit=""
                 />
-                <span className="w-[2vw] text-right text-[0.75vw] text-gray-700 font-semibold">
-                  {logoSettings?.opacity ?? 100}%
-                </span>
+                <AdjustmentSlider 
+                  label="Contrast" 
+                  value={logoSettings?.adjustments?.contrast || 0} 
+                  onChange={(val) => handleAdjustmentChange('contrast', val)} 
+                  unit=""
+                />
+                <AdjustmentSlider 
+                  label="Saturation" 
+                  value={logoSettings?.adjustments?.saturation || 0} 
+                  onChange={(val) => handleAdjustmentChange('saturation', val)} 
+                  unit=""
+                />
+                <AdjustmentSlider 
+                  label="Temperature" 
+                  value={logoSettings?.adjustments?.temperature || 0} 
+                  onChange={(val) => handleAdjustmentChange('temperature', val)} 
+                  unit=""
+                />
+                <AdjustmentSlider 
+                  label="Tint" 
+                  value={logoSettings?.adjustments?.tint || 0} 
+                  onChange={(val) => handleAdjustmentChange('tint', val)} 
+                  unit=""
+                />
+                <AdjustmentSlider 
+                  label="Highlights" 
+                  value={logoSettings?.adjustments?.highlights || 0} 
+                  onChange={(val) => handleAdjustmentChange('highlights', val)} 
+                  unit=""
+                />
+                <AdjustmentSlider 
+                  label="Shadows" 
+                  value={logoSettings?.adjustments?.shadows || 0} 
+                  onChange={(val) => handleAdjustmentChange('shadows', val)} 
+                  unit=""
+                />
               </div>
             </div>
 

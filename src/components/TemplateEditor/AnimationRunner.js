@@ -57,9 +57,14 @@ export const initAnimationRunner = function(doc) {
   };
 
   const runAnim = (el, type, settings) => {
-    if (!type || !WAAPI_ANIMATIONS[type] || type === 'none') return;
+    if (!type || !WAAPI_ANIMATIONS[type] || type === 'none') {
+        if (el.__currentAnimation) {
+            el.__currentAnimation.cancel();
+            el.__currentAnimation = null;
+        }
+        return;
+    }
     
-    // Check if it's already running to avoid overlaps on "On Page" actions
     if (el.__currentAnimation) {
       el.__currentAnimation.cancel();
     }
@@ -84,84 +89,112 @@ export const initAnimationRunner = function(doc) {
   };
 
   const handleTrigger = () => {
-    // 1. While Opening
-    doc.querySelectorAll('[data-animation-trigger="While Opening"]').forEach(el => {
-      const type = el.getAttribute('data-animation-open-type');
-      if (type && type !== 'none') {
-        const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
+    doc.querySelectorAll('[data-animation-trigger]').forEach(el => {
+        const trigger = el.getAttribute('data-animation-trigger');
         
-        // Settings for change detection
-        const settingsStr = JSON.stringify({
-           type,
-           duration: el.getAttribute('data-animation-open-duration'),
-           speed: el.getAttribute('data-animation-open-speed'),
-           delay: el.getAttribute('data-animation-open-delay'),
-           easing: el.getAttribute('data-animation-open-easing')
-        });
+        // 1. While Opening
+        if (trigger === 'While Opening') {
+            const type = el.getAttribute('data-animation-open-type');
+            if (type && type !== 'none') {
+                const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
+                const settingsStr = JSON.stringify({
+                   type,
+                   duration: el.getAttribute('data-animation-open-duration'),
+                   speed: el.getAttribute('data-animation-open-speed'),
+                   delay: el.getAttribute('data-animation-open-delay'),
+                   easing: el.getAttribute('data-animation-open-easing')
+                });
 
-        const hasChanged = el.__lastOpenSettings !== settingsStr;
-        
-        if (!everyVisit && el.__animOpened && !hasChanged) return;
-        
-        runAnim(el, type, {
-          duration: el.getAttribute('data-animation-open-duration'),
-          speed: el.getAttribute('data-animation-open-speed'),
-          delay: el.getAttribute('data-animation-open-delay'),
-          easing: el.getAttribute('data-animation-open-easing')
-        });
-        
-        el.__animOpened = true;
-        el.__lastOpenSettings = settingsStr;
-      }
-    });
-
-    // 2. On Page - Always
-    doc.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Always"]').forEach(el => {
-      const type = el.getAttribute('data-animation-interact-type');
-      if (type && type !== 'none') {
-        runAnim(el, type, {
-          duration: el.getAttribute('data-animation-interact-duration'),
-          speed: el.getAttribute('data-animation-interact-speed'),
-          delay: el.getAttribute('data-animation-interact-delay'),
-          easing: el.getAttribute('data-animation-interact-easing')
-        });
-      }
-    });
-
-    // 3. On Page - Click
-    doc.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Click"]').forEach(el => {
-      if (el.__clickBound) return;
-      el.__clickBound = true;
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const type = el.getAttribute('data-animation-interact-type');
-        if (type && type !== 'none') {
-          runAnim(el, type, {
-            duration: el.getAttribute('data-animation-interact-duration'),
-            speed: el.getAttribute('data-animation-interact-speed'),
-            delay: el.getAttribute('data-animation-interact-delay'),
-            easing: el.getAttribute('data-animation-interact-easing')
-          });
+                const hasChanged = el.__lastOpenSettings !== settingsStr;
+                if (!everyVisit && el.__animOpened && !hasChanged) return;
+                
+                runAnim(el, type, {
+                  duration: el.getAttribute('data-animation-open-duration'),
+                  speed: el.getAttribute('data-animation-open-speed'),
+                  delay: el.getAttribute('data-animation-open-delay'),
+                  easing: el.getAttribute('data-animation-open-easing')
+                });
+                
+                el.__animOpened = true;
+                el.__lastOpenSettings = settingsStr;
+            } else {
+                runAnim(el, 'none'); // Cleanup
+            }
         }
-      });
-    });
+        
+        // 2. On Page - Always
+        else if (trigger === 'On Page' && el.getAttribute('data-animation-action') === 'Always') {
+            const type = el.getAttribute('data-animation-interact-type');
+            if (type && type !== 'none') {
+                const settingsStr = JSON.stringify({
+                  type,
+                  duration: el.getAttribute('data-animation-interact-duration'),
+                  speed: el.getAttribute('data-animation-interact-speed'),
+                  delay: el.getAttribute('data-animation-interact-delay'),
+                  easing: el.getAttribute('data-animation-interact-easing')
+                });
 
-    // 4. On Page - Hover
-    doc.querySelectorAll('[data-animation-trigger="On Page"][data-animation-action="Hover"]').forEach(el => {
-      if (el.__hoverBound) return;
-      el.__hoverBound = true;
-      el.addEventListener('mouseenter', () => {
-        const type = el.getAttribute('data-animation-interact-type');
-        if (type && type !== 'none') {
-          runAnim(el, type, {
-            duration: el.getAttribute('data-animation-interact-duration'),
-            speed: el.getAttribute('data-animation-interact-speed'),
-            delay: el.getAttribute('data-animation-interact-delay'),
-            easing: el.getAttribute('data-animation-interact-easing')
-          });
+                if (el.__lastAlwaysSettings === settingsStr) return;
+
+                runAnim(el, type, {
+                  duration: el.getAttribute('data-animation-interact-duration'),
+                  speed: el.getAttribute('data-animation-interact-speed'),
+                  delay: el.getAttribute('data-animation-interact-delay'),
+                  easing: el.getAttribute('data-animation-interact-easing')
+                });
+                el.__lastAlwaysSettings = settingsStr;
+            } else {
+                runAnim(el, 'none');
+                el.__lastAlwaysSettings = null;
+            }
         }
-      });
+
+        // 3. On Page - Click/Hover
+        else if (trigger === 'On Page') {
+            const action = el.getAttribute('data-animation-action');
+            if (action === 'Click') {
+                if (!el.__clickBound) {
+                    el.__clickBound = true;
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', (e) => {
+                        if (el.getAttribute('data-animation-trigger') !== 'On Page' || el.getAttribute('data-animation-action') !== 'Click') return;
+                        e.stopPropagation();
+                        const type = el.getAttribute('data-animation-interact-type');
+                        runAnim(el, type, {
+                            duration: el.getAttribute('data-animation-interact-duration'),
+                            speed: el.getAttribute('data-animation-interact-speed'),
+                            delay: el.getAttribute('data-animation-interact-delay'),
+                            easing: el.getAttribute('data-animation-interact-easing')
+                        });
+                    });
+                }
+            } else if (action === 'Hover') {
+                if (!el.__hoverBound) {
+                    el.__hoverBound = true;
+                    el.addEventListener('mouseenter', () => {
+                        if (el.getAttribute('data-animation-trigger') !== 'On Page' || el.getAttribute('data-animation-action') !== 'Hover') return;
+                        const type = el.getAttribute('data-animation-interact-type');
+                        runAnim(el, type, {
+                            duration: el.getAttribute('data-animation-interact-duration'),
+                            speed: el.getAttribute('data-animation-interact-speed'),
+                            delay: el.getAttribute('data-animation-interact-delay'),
+                            easing: el.getAttribute('data-animation-interact-easing')
+                        });
+                    });
+                }
+            }
+            // If it was "Always" but now it's "Click", Always loop should stop
+            if (el.__lastAlwaysSettings) {
+                runAnim(el, 'none');
+                el.__lastAlwaysSettings = null;
+            }
+        }
+        
+        // 4. Default if trigger is unknown or none
+        else {
+            runAnim(el, 'none');
+            el.__lastAlwaysSettings = null;
+        }
     });
   };
 
@@ -182,6 +215,21 @@ export const initAnimationRunner = function(doc) {
     childList: true,
     subtree: true,
     attributes: true
+  });
+
+  // Listen for re-trigger messages (for flipbook flips)
+  window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'RETRIGGER_ANIMATIONS') {
+          // Only reset entrance state if everyVisit is enabled
+          doc.querySelectorAll('[data-animation-trigger="While Opening"]').forEach(el => {
+              const everyVisit = el.getAttribute('data-animation-open-every-visit') !== 'false';
+              if (everyVisit) {
+                  el.__animOpened = false;
+                  el.__lastOpenSettings = null;
+              }
+          });
+          handleTrigger();
+      }
   });
 
   handleTrigger();

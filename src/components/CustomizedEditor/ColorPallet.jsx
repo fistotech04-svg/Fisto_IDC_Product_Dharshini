@@ -58,10 +58,28 @@ const hsvToHex = ({ h, s, v }) => {
  
 export default function ColorPicker({ color, onChange, opacity, onOpacityChange, onClose, className, style, ...props }) {
   const [hsv, setHsv] = useState(() => hexToHsv(color));
- 
+  const pickerRef = useRef(null);
+
   useEffect(() => {
     setHsv(hexToHsv(color));
   }, [color]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if the click is outside the picker and not on a color-picker-trigger
+      // (The trigger check is to avoid immediate closure when opening)
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) {
+        if (!event.target.closest('.color-picker-trigger')) {
+           if (onClose) onClose();
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [onClose]);
  
   const handleSaturationChange = useCallback((e, container) => {
     const { width, height, left, top } = container.getBoundingClientRect();
@@ -119,8 +137,9 @@ export default function ColorPicker({ color, onChange, opacity, onOpacityChange,
  
   return (
     <div
-        className={`z-50 w-[15vw] bg-white rounded-[1vw] shadow-[0_0.5vw_2vw_-0.25vw_rgba(0,0,0,0.15)] border border-gray-100 p-[1vw] animate-in fade-in zoom-in-95 duration-200 select-none font-sans ${className || ""}`}
-        style={style}
+        ref={pickerRef}
+        className={`fixed z-[500] w-[15vw] bg-white rounded-[1vw] shadow-[0_0.5vw_2vw_-0.25vw_rgba(0,0,0,0.15)] border border-gray-100 p-[1vw] animate-in fade-in zoom-in-95 duration-200 select-none font-sans ${className || ""}`}
+        style={{ top: '60%', left: '24vw', transform: 'translate(-50%, -50%)' }}
         {...props}
     >
        {/* Header */}
