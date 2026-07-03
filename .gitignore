@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+dist/
+.env
+
+# Ignore large asset folders
+src/assets/bgimg/
+src/assets/cover/
+src/assets/Floating Animations/
+src/assets/layout/
+src/assets/Pop-Up Templates/
+src/assets/Templates/
+src/assets/Videos/

@@ -1,0 +1,1863 @@
+import React, { useState, useEffect, useLayoutEffect } from "react";
+import * as THREE from "three";
+import { TransformControls } from "@react-three/drei";
+import { GLTFExporter } from "three-stdlib";
+import { OBJExporter } from "three-stdlib";
+import { STLExporter } from "three-stdlib";
+import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
+
+// Global cache and shared loader to prevent redundant network requests and decoding
+// We use a private LoadingManager to avoid triggering the global useProgress spinner
+const globalTextureCache = new Map();
+const privateTextureManager = new THREE.LoadingManager();
+const sharedTextureLoader = new THREE.TextureLoader(privateTextureManager);
+sharedTextureLoader.setCrossOrigin('anonymous');
+
+// Helper to extract a usable image URL/DataURL from a Three.js texture
+const getTextureSource = (tex) => {
+    if (!tex || !tex.image) return null;
+    const img = tex.image;
+    
+    // 1. If it's a standard Image/HTMLImageElement with a valid src
+    if (img.src && (img.src.startsWith('http') || img.src.startsWith('blob:') || img.src.startsWith('data:'))) {
+        return img.src;
+    }
+    
+    // 2. If it's a Canvas element
+    if (img instanceof HTMLCanvasElement) {
+        try { return img.toDataURL(); } catch (e) { return null; }
+    }
+
+    // 3. Fallback: Draw to a temporary canvas to extract the data
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width || img.naturalWidth || 256;
+        canvas.height = img.height || img.naturalHeight || 256;
+        
+        if (canvas.width === 0 || canvas.height === 0) return null;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return canvas.toDataURL();
+    } catch (e) {
+        console.warn("Failed to extract texture data URL:", e);
+        return null;
+    }
+};
+
+const GenericModel = React.memo(React.forwardRef(({ scene, wireframe, setModelStats, setMaterialList, selectedMaterial, onSelectMaterial, modelName, transformMode, materialSettings, hiddenMaterials, onTransformChange, onTransformEnd, transformValues, selectedTexture, onTextureApplied, onTextureIdentified, onUpdateMaterialSetting, resetKey, sceneResetTrigger, uvUnwrapTrigger, isSelectionDisabled }, ref) => {
+  const [position, setPosition] = useState([0, 0, 0]);
+  const [scale, setScale] = useState(1);
+  const groupRef = React.useRef(null);
+  const [modelGroup, setModelGroup] = useState(null);
+  const [syncedSelectionSignature, setSyncedSelectionSignature] = useState(null);
+  const activeTextureRef = React.useRef(selectedTexture);
+  activeTextureRef.current = selectedTexture;
+
+  // Multi-mesh transform support for shared materials
+  const relatedMeshesRef = React.useRef([]);
+  const followerOffsetsRef = React.useRef(new Map()); // Map<UUID, Matrix4 (relative to leader)>
+  const isSyncingRef = React.useRef(false);
+
+  // Mesh Index for fast material lookups - avoids expensive scene.traverse calls
+  const meshIndexRef = React.useRef(new Map()); // Map<MaterialName, Mesh[]>
+
+
+  // Expose Helper Functionality
+  React.useImperativeHandle(ref, () => ({
+      deleteMaterial: (matName) => {
+          if (!scene) return;
+          const meshesToRemove = [];
+          scene.traverse((child) => {
+              if (child.isMesh && child.material) {
+                  let shouldDelete = false;
+                  if (Array.isArray(child.material)) {
+                      shouldDelete = child.material.some(m => m.name === matName);
+                  } else {
+                      shouldDelete = child.material.name === matName;
+                  }
+                  if (shouldDelete) meshesToRemove.push(child);
+              }
+          });
+          meshesToRemove.forEach(mesh => {
+              if (mesh.parent) {
+                  mesh.parent.remove(mesh);
+                  if (mesh.geometry) mesh.geometry.dispose();
+              }
+          });
+      },
+      renameMaterial: (oldName, newName) => {
+          if (!scene || !oldName || !newName) return;
+          scene.traverse((child) => {
+              if (child.isMesh && child.material) {
+                  const mats = Array.isArray(child.material) ? child.material : [child.material];
+                  mats.forEach(m => {
+                      if (m.name === oldName) {
+                          m.name = newName;
+                      }
+                  });
+              }
+          });
+      }
+  }));
+    
+  // 0. Apply Texture to Selected Material
+  useEffect(() => {
+     if (!selectedTexture || !scene) return;
+     
+     // Use a separate LoadingManager to avoid triggering the global useProgress spinner
+     const textureManager = new THREE.LoadingManager();
+     const loader = new THREE.TextureLoader(textureManager);
+     
+     const resolveUrl = (url) => {
+        if (!url) return null;
+        if (typeof url !== 'string') return url;
+        if (url.startsWith('/uploads')) {
+            return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${url}`;
+        }
+        return url;
+     };
+
+     const loadMap = (url, isColor = false) => {
+          const resolved = resolveUrl(url);
+          if (!resolved || resolved === "existing") return null;
+
+          const cacheKey = `${resolved}_${isColor}`;
+          if (globalTextureCache.has(cacheKey)) {
+              return globalTextureCache.get(cacheKey);
+          }
+
+          const tex = sharedTextureLoader.load(resolved, (t) => {
+              t.wrapS = t.wrapT = THREE.RepeatWrapping;
+              t.flipY = false; 
+              t.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+              t.anisotropy = 8; // Performance optimization: 8 is usually plenty and faster than 16
+              t.needsUpdate = true;
+          });
+
+          globalTextureCache.set(cacheKey, tex);
+          return tex;
+     }
+
+     const newMaps = {};
+     const m = selectedTexture?.maps || {};
+     // Support both old keys (map, normalMap) and new keys (base, normal)
+     const baseImg = m.map || m.base;
+     const normalImg = m.normalMap || m.normal;
+     const roughnessImg = m.roughnessMap || m.roughness;
+     const metallicImg = m.metalnessMap || m.metallic || m.metalness;
+     const aoImg = m.aoMap || m.ao;
+     const displacementImg = m.displacementMap || m.displacement;
+     const alphaImg = m.alphaMap || m.opacity;
+
+     if (baseImg) newMaps.map = loadMap(baseImg, true);
+     if (normalImg) newMaps.normalMap = loadMap(normalImg, false);
+     if (roughnessImg) newMaps.roughnessMap = loadMap(roughnessImg, false);
+     if (metallicImg) newMaps.metalnessMap = loadMap(metallicImg, false);
+     if (aoImg) newMaps.aoMap = loadMap(aoImg, false);
+     if (displacementImg) newMaps.displacementMap = loadMap(displacementImg, false);
+     if (alphaImg) newMaps.alphaMap = loadMap(alphaImg, false);
+
+     const selMat = selectedMaterial; 
+     const targetMatName = selMat ? selMat.name : null;
+
+     const isFullModelSelect = !targetMatName || (modelName && targetMatName === modelName) || targetMatName === "Scene";
+
+     // Optimized application using mesh index
+     const processedMaterials = new Set();
+     const applyToMesh = (child) => {
+          if (child.isMesh && child.material) {
+              const apply = (mat) => {
+                   if (!mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial && !mat.isMeshPhongMaterial) return;
+                   if (processedMaterials.has(mat.uuid)) return;
+                   processedMaterials.add(mat.uuid);
+                   
+                    // Surgical replacement: Only replace maps that are provided by the new texture.
+                    // This prevents clobbering existing maps (like an original diffuse map) when applying a partial gallery texture.
+                    if (newMaps.map) mat.map = newMaps.map;
+                    if (newMaps.normalMap) {
+                        mat.normalMap = newMaps.normalMap;
+                        mat.bumpMap = newMaps.normalMap; // Use normal map as bump fallback
+                        if (!mat.bumpScale) mat.bumpScale = 1;
+                    }
+                    if (newMaps.aoMap) mat.aoMap = newMaps.aoMap;
+                    if (newMaps.displacementMap) {
+                        mat.displacementMap = newMaps.displacementMap;
+                        if (mat.displacementScale === undefined) mat.displacementScale = 0.01;
+                    }
+                    if (newMaps.alphaMap) {
+                        mat.alphaMap = newMaps.alphaMap;
+                        mat.transparent = true;
+                    }
+                    
+                    // Clear any ongoing flash and reset emissive
+                    mat.userData.isFlashing = false;
+                    if (mat.emissive && typeof mat.emissive.set === 'function') {
+                        mat.emissive.set(0, 0, 0);
+                        mat.emissiveIntensity = 0;
+                    }
+
+                    if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial || mat.isMeshPhongMaterial) {
+                        if (newMaps.roughnessMap) {
+                            mat.roughnessMap = newMaps.roughnessMap;
+                            mat.roughness = 1.0; // Reset factor for full map influence
+                        }
+                        if (newMaps.metalnessMap) {
+                            mat.metalnessMap = newMaps.metalnessMap;
+                            if (mat.metalness !== undefined) mat.metalness = 1.0;
+                        }
+                        
+                        // Reset color to white if a base map is being applied so it's not tinted
+                        if (newMaps.map && mat.color && typeof mat.color.set === 'function') {
+                            mat.color.set(0xffffff);
+                        }
+                    }
+                    
+                    // Save the full texture object for later identification
+                    if (selectedTexture.id) {
+                        mat.userData.appliedTexture = selectedTexture;
+                        mat.userData.appliedTextureId = selectedTexture.id;
+                    } else {
+                        delete mat.userData.appliedTexture;
+                        delete mat.userData.appliedTextureId;
+                    }
+                    
+                    mat.needsUpdate = true;
+              };
+
+              if (Array.isArray(child.material)) {
+                  child.material.forEach(apply);
+              } else {
+                  apply(child.material);
+              }
+          }
+     };
+
+     if (isFullModelSelect) {
+         meshIndexRef.current.forEach(meshes => {
+             meshes.forEach(applyToMesh);
+         });
+     } else if (targetMatName && meshIndexRef.current.has(targetMatName)) {
+         const targetMeshes = meshIndexRef.current.get(targetMatName);
+         targetMeshes.forEach(applyToMesh);
+     }
+     
+     // Update the UI immediately to reflect the new texture as "Active" for this material
+     if (typeof onTextureIdentified === 'function') {
+         onTextureIdentified(selectedTexture.id || null);
+     }
+
+     // Notify parent that texture has been processed so we can reset state
+     if (typeof onTextureApplied === 'function') {
+         onTextureApplied();
+     }
+  }, [selectedTexture, scene, selectedMaterial, modelName, onTextureApplied, onTextureIdentified]);
+
+  // 0.2. Apply Manual Map Uploads
+  useEffect(() => {
+    if (!materialSettings?.maps || !scene) return;
+    
+    // We only apply to the selected material (scoping is handled by the component that updates maps)
+    const selMat = selectedMaterial;
+    const targetMatName = selMat ? selMat.name : null;
+    
+    // If "Scene" or model group is selected, we could potentially apply to all, 
+    // but typically manual map uploads are for specific materials.
+    const isFullModel = !selMat || targetMatName === modelName || targetMatName === "Scene";
+    if (!targetMatName && !isFullModel) return;
+
+    const textureManager = new THREE.LoadingManager();
+    const loader = new THREE.TextureLoader(textureManager);
+    
+    const resolveUrlLocal = (url) => {
+        if (!url) return null;
+        if (typeof url !== 'string') return url;
+        if (url.startsWith('/uploads')) {
+            return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${url}`;
+        }
+        return url;
+    };
+
+    const loadMapManual = (url, isColor = false) => {
+          const resolved = resolveUrlLocal(url);
+          if (!resolved || resolved === "existing") return null;
+          
+          const cacheKey = `${resolved}_${isColor}`;
+          if (globalTextureCache.has(cacheKey)) {
+              return globalTextureCache.get(cacheKey);
+          }
+
+          const tex = sharedTextureLoader.load(resolved, (t) => {
+              t.wrapS = t.wrapT = THREE.RepeatWrapping;
+              t.flipY = false; 
+              t.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+              t.anisotropy = 8;
+              t.needsUpdate = true;
+          });
+          
+          globalTextureCache.set(cacheKey, tex);
+          return tex;
+    }
+
+    const newMapsList = materialSettings.maps;
+    const loadedMaps = {};
+    
+    // Support both old keys and new keys
+    const baseImg = newMapsList.map || newMapsList.base;
+    const normalImg = newMapsList.normalMap || newMapsList.normal;
+    const roughnessImg = newMapsList.roughnessMap || newMapsList.roughness;
+    const metalnessImg = newMapsList.metalnessMap || newMapsList.metallic || newMapsList.metalness;
+    const displacementImg = newMapsList.displacementMap || newMapsList.displacement;
+    const aoImg = newMapsList.aoMap || newMapsList.ao;
+    const alphaImg = newMapsList.alphaMap || newMapsList.opacity;
+    const emissiveImg = newMapsList.emissiveMap || newMapsList.emissive;
+
+    if (baseImg) loadedMaps.map = loadMapManual(baseImg, true);
+    if (normalImg) loadedMaps.normalMap = loadMapManual(normalImg, false);
+    if (roughnessImg) loadedMaps.roughnessMap = loadMapManual(roughnessImg, false);
+    if (metalnessImg) loadedMaps.metalnessMap = loadMapManual(metalnessImg, false);
+    if (displacementImg) loadedMaps.displacementMap = loadMapManual(displacementImg, false);
+    if (aoImg) loadedMaps.aoMap = loadMapManual(aoImg, false);
+    if (alphaImg) loadedMaps.alphaMap = loadMapManual(alphaImg, false);
+    if (emissiveImg) loadedMaps.emissiveMap = loadMapManual(emissiveImg, true);
+
+    const applyToMeshLocal = (child) => {
+         if (child.isMesh && child.material) {
+             const apply = (mat) => {
+                  const hasMapUpdate = newMapsList.hasOwnProperty('map') && newMapsList.map !== "existing";
+                  const hasNormalUpdate = newMapsList.hasOwnProperty('normalMap') && newMapsList.normalMap !== "existing";
+                  const hasRoughnessUpdate = newMapsList.hasOwnProperty('roughnessMap') && newMapsList.roughnessMap !== "existing";
+                  const hasMetalnessUpdate = newMapsList.hasOwnProperty('metalnessMap') && newMapsList.metalnessMap !== "existing";
+                  const hasBumpUpdate = newMapsList.hasOwnProperty('bumpMap') && newMapsList.bumpMap !== "existing";
+                  const hasAoUpdate = newMapsList.hasOwnProperty('aoMap') && newMapsList.aoMap !== "existing";
+                  const hasDispUpdate = newMapsList.hasOwnProperty('displacementMap') && newMapsList.displacementMap !== "existing";
+
+                  if (hasMapUpdate) {
+                      const nextMap = loadedMaps.map || null;
+                      if (mat.map !== nextMap) mat.map = nextMap;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.map = newMapsList.map;
+                  }
+                  
+                  if (hasNormalUpdate) {
+                      const nextNormal = loadedMaps.normalMap || null;
+                      if (mat.normalMap !== nextNormal) mat.normalMap = nextNormal;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.normalMap = newMapsList.normalMap;
+                      if (mat.normalMap && !mat.normalScale) mat.normalScale = new THREE.Vector2(1, 1);
+                  }
+                  
+                  if (hasRoughnessUpdate) {
+                      const nextRoughness = loadedMaps.roughnessMap || null;
+                      if (mat.roughnessMap !== nextRoughness) mat.roughnessMap = nextRoughness;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.roughnessMap = newMapsList.roughnessMap;
+                      if (mat.roughnessMap) mat.roughness = 1.0;
+                  }
+                  
+                  if (hasMetalnessUpdate) {
+                      const nextMetalness = loadedMaps.metalnessMap || null;
+                      if (mat.metalnessMap !== nextMetalness) mat.metalnessMap = nextMetalness;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.metalnessMap = newMapsList.metalnessMap;
+                      if (mat.metalnessMap) mat.metalness = 1.0;
+                  }
+                  
+                  if (hasDispUpdate) {
+                      const nextDisp = loadedMaps.displacementMap || null;
+                      if (mat.displacementMap !== nextDisp) mat.displacementMap = nextDisp;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.displacementMap = newMapsList.displacementMap;
+                      if (mat.displacementMap && mat.displacementScale === undefined) mat.displacementScale = 0.01;
+                  }
+                  
+                  if (hasAoUpdate) {
+                      const nextAo = loadedMaps.aoMap || null;
+                      if (mat.aoMap !== nextAo) mat.aoMap = nextAo;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.aoMap = newMapsList.aoMap;
+                      if (mat.aoMap && mat.aoMapIntensity === undefined) mat.aoMapIntensity = 1;
+                  }
+
+                  if (newMapsList.hasOwnProperty('alphaMap') && newMapsList.alphaMap !== "existing") {
+                      const nextAlpha = loadedMaps.alphaMap || null;
+                      if (mat.alphaMap !== nextAlpha) mat.alphaMap = nextAlpha;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.alphaMap = newMapsList.alphaMap;
+                  }
+
+                  if (newMapsList.hasOwnProperty('emissiveMap') && newMapsList.emissiveMap !== "existing") {
+                      const nextEmissive = loadedMaps.emissiveMap || null;
+                      if (mat.emissiveMap !== nextEmissive) mat.emissiveMap = nextEmissive;
+                      if (!mat.userData.manualMaps) mat.userData.manualMaps = {};
+                      mat.userData.manualMaps.emissiveMap = newMapsList.emissiveMap;
+                  }
+                  
+                  mat.needsUpdate = true;
+             };
+
+             if (Array.isArray(child.material)) {
+                 child.material.forEach(apply);
+             } else {
+                 apply(child.material);
+             }
+         }
+    };
+
+    const applyToTarget = (meshes) => {
+        meshes.forEach(applyToMeshLocal);
+    };
+
+    if (isFullModel) {
+        // Guard: In Full Model mode, only apply manual map overrides if explicitly enabled
+        if (!materialSettings.useFactorColor) return;
+        meshIndexRef.current.forEach(applyToTarget);
+    } else if (targetMatName && meshIndexRef.current.has(targetMatName)) {
+        applyToTarget(meshIndexRef.current.get(targetMatName));
+    }
+
+  }, [materialSettings?.maps, scene, selectedMaterial, modelName]);
+
+  // 0.6. Sync UI with Selected Material (Fetch existing values)
+
+
+  // 0.5 Detect Current Texture on Selection Change
+  useEffect(() => {
+      if (!scene || !onTextureIdentified) return;
+
+      const isFullModel = !selectedMaterial || (modelName && selectedMaterial.name === modelName) || selectedMaterial.name === "Scene";
+      const targetMatName = isFullModel ? null : selectedMaterial.name;
+      
+      let foundMat = null;
+
+      if (!isFullModel) {
+          const targetParentGroup = selectedMaterial.parentGroup;
+          if (targetParentGroup && targetParentGroup !== modelName && targetParentGroup !== "Scene") {
+              onTextureIdentified(null);
+              return;
+          }
+          if (selectedMaterial.isGroup && selectedMaterial.name !== modelName && selectedMaterial.name !== "Scene") {
+              onTextureIdentified(null);
+              return;
+          }
+      }
+      
+      if (isFullModel) {
+          // Find first material style
+          scene.traverse((child) => {
+              if (foundMat) return;
+              if (child.isMesh && child.material) {
+                  foundMat = Array.isArray(child.material) ? child.material[0] : child.material;
+              }
+          });
+      } else if (targetMatName && meshIndexRef.current.has(targetMatName)) {
+          // Optimized lookup using mesh index
+          const targetMeshes = meshIndexRef.current.get(targetMatName);
+          if (targetMeshes.length > 0) {
+              const mesh = targetMeshes[0];
+              if (Array.isArray(mesh.material)) {
+                  foundMat = mesh.material.find(m => m.name === targetMatName);
+              } else {
+                  foundMat = mesh.material;
+              }
+          }
+      }
+
+      // Helper to extract URL from a Three.js Texture
+      const getTexUrl = (tex) => {
+          return getTextureSource(tex) || "existing";
+      };
+
+      if (foundMat && foundMat.userData && foundMat.userData.appliedTextureId) {
+          if (typeof onTextureIdentified === 'function') onTextureIdentified(foundMat.userData.appliedTextureId);
+      } else {
+          if (typeof onTextureIdentified === 'function') onTextureIdentified(null);
+      }
+
+      // Sync Manual Maps or Original Model Maps back to UI (Detected but not re-applied)
+      if (foundMat) {
+          if (foundMat.userData && foundMat.userData.manualMaps) {
+              if (typeof onUpdateMaterialSetting === 'function') {
+                  onUpdateMaterialSetting('maps', foundMat.userData.manualMaps);
+              }
+          } else {
+              // Extract current visual state for the UI checkmarks
+              const nativeMaps = {};
+              const applied = foundMat.userData.appliedTexture;
+              const aMaps = applied?.maps || {};
+
+              if (foundMat.map) nativeMaps.map = getTexUrl(foundMat.map);
+              if (foundMat.normalMap) nativeMaps.normalMap = getTexUrl(foundMat.normalMap);
+              if (foundMat.roughnessMap) nativeMaps.roughnessMap = getTexUrl(foundMat.roughnessMap);
+              if (foundMat.metalnessMap) nativeMaps.metalnessMap = getTexUrl(foundMat.metalnessMap);
+              if (foundMat.displacementMap) nativeMaps.displacementMap = getTexUrl(foundMat.displacementMap);
+              if (foundMat.aoMap) nativeMaps.aoMap = getTexUrl(foundMat.aoMap);
+
+              if (typeof onUpdateMaterialSetting === 'function') {
+                  onUpdateMaterialSetting('maps', nativeMaps);
+                  
+                  // Sync existing scale back to UI
+                  if (foundMat.map && foundMat.map.repeat) {
+                      const detectedScale = Math.round(100 / (foundMat.map.repeat.x || 1));
+                      onUpdateMaterialSetting('scale', detectedScale);
+                  }
+              }
+          }
+      } else {
+          if (typeof onUpdateMaterialSetting === 'function') {
+              onUpdateMaterialSetting('maps', {});
+          }
+      }
+
+  }, [selectedMaterial, scene, onTextureIdentified, onUpdateMaterialSetting, modelName]);
+  
+  // 1. Initial Setup: Centering, Scaling, Stats, Material Naming
+  useLayoutEffect(() => {
+    if (!scene) return;
+
+    // Reset position and scale to calculate true bounding box
+    scene.position.set(0, 0, 0);
+    scene.scale.set(1, 1, 1);
+    scene.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    
+    box.getSize(size);
+    box.getCenter(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    let targetScale = 1;
+
+    if (maxDim > 0) {
+        targetScale = 3 / maxDim;
+    }
+
+    setScale(targetScale);
+
+    const centeredX = -center.x * targetScale;
+    const centeredZ = -center.z * targetScale;
+    const bottomY = -box.min.y * targetScale; 
+     
+    setPosition([centeredX, bottomY, centeredZ]);
+    
+    // Persistent storage of normalization baseline on the scene object itself
+    scene.userData.normalization = {
+        position: [centeredX, bottomY, centeredZ],
+        scale: targetScale
+    };
+
+    // Stats & Material Naming
+    let vertCount = 0;
+    let polyCount = 0;
+    const processedMaterials = new Map();
+    const usedNames = new Set();
+    let unnamedCount = 1;
+
+    const groupMap = new Map(); // GroupName -> Set<MaterialName>
+    const ungroupedMats = new Set();
+    const meshIndex = new Map();
+
+    scene.traverse((child) => {
+      if (child.isMesh) {
+        // Build Mesh Index for fast lookups later
+        if (child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => {
+                const name = m.name || m.uuid; // Use name if set, otherwise uuid as fallback
+                if (!meshIndex.has(name)) meshIndex.set(name, []);
+                meshIndex.get(name).push(child);
+            });
+        }
+
+        child.castShadow = true;
+        child.receiveShadow = true;
+
+        // Geometry Stats
+        const geom = child.geometry;
+        if (geom) {
+          const newGeom = child.geometry;
+          // Recalculate normals ONLY if they are missing
+          if (!newGeom.attributes.normal) {
+              newGeom.computeVertexNormals();
+          }
+
+          // AUTO-UNWRAP: If model has no UVs, apply default Box Mapping immediately
+          if (!newGeom.attributes.uv) {
+              applyBoxUV(child);
+          }
+
+          // Compute tangents for smooth normal mapping if UVs exist and they don't already exist
+          if (newGeom?.attributes?.uv && !newGeom?.attributes?.tangent && newGeom?.computeTangents) {
+              try { newGeom?.computeTangents(); } catch(e) { console.warn("Tangents skip:", e?.message); }
+          }
+
+          if (newGeom.attributes.normal) newGeom.attributes.normal.needsUpdate = true;
+
+          vertCount += newGeom.attributes.position.count;
+          if (newGeom.index) {
+            polyCount += newGeom.index.count / 3;
+          } else {
+            polyCount += newGeom.attributes.position.count / 3;
+          }
+        }
+        
+        // Material Naming & Grouping logic
+        if (child.material) {
+            
+            // Determine Group Name
+            let groupName = null;
+            if (child.parent && child.parent.isGroup && child.parent.name && child.parent.name !== 'Scene') {
+                 groupName = child.parent.name;
+            }
+
+            const processMat = (m) => {
+                let uniqueName = processedMaterials.get(m.uuid);
+
+                if (!uniqueName) {
+                    let name = m.name; 
+                    if (!name || name.trim() === '') {
+                        const suffix = String(unnamedCount++).padStart(2, '0');
+                        name = `Material_${suffix}`;
+                    }
+                    
+                    name = name.replace(/[:|]/g, " ").trim();
+                    
+                    uniqueName = name;
+                    let conflictCount = 1;
+                    while (usedNames.has(uniqueName)) {
+                        uniqueName = `${name}_${String(conflictCount++).padStart(2, '0')}`;
+                    }
+                    
+                    m.name = uniqueName;
+                    processedMaterials.set(m.uuid, uniqueName);
+                    usedNames.add(uniqueName);
+
+                    // Ensure both sides are visible and depth is handled correctly
+                    m.side = THREE.DoubleSide;
+                    m.depthWrite = true;
+
+                    // Ensure original data is stored for visibility/UI logic
+                    if (!m.userData.originalColor) m.userData.originalColor = m.color?.clone();
+                    if (m.userData.originalOpacity === undefined) m.userData.originalOpacity = m.opacity;
+                    if (m.map) m.userData.originalMap = m.map;
+                    if (m.normalMap) m.userData.originalNormalMap = m.normalMap;
+                    if (m.alphaMap) m.userData.originalAlphaMap = m.alphaMap;
+                }
+
+                // Add to Group or Ungrouped
+                if (groupName) {
+                    if (!groupMap.has(groupName)) groupMap.set(groupName, new Set());
+                    groupMap.get(groupName).add(uniqueName);
+                } else {
+                    ungroupedMats.add(uniqueName);
+                }
+            };
+
+            if (Array.isArray(child.material)) {
+                child.material.forEach(processMat);
+            } else {
+                processMat(child.material);
+            }
+        }
+      }
+    });
+
+    meshIndexRef.current = meshIndex;
+
+    // Filter Ungrouped Materials
+    const allGroupedMaterialNames = new Set();
+    groupMap.forEach((matSet) => {
+        matSet.forEach(name => allGroupedMaterialNames.add(name));
+    });
+
+    for (const name of ungroupedMats) {
+        if (allGroupedMaterialNames.has(name)) {
+            ungroupedMats.delete(name);
+        }
+    }
+
+    // Construct Structured List
+    const structuredList = [];
+    
+    // Add Groups
+    const sortedGroups = Array.from(groupMap.keys()).sort();
+    sortedGroups.forEach(grp => {
+        structuredList.push({
+            group: grp,
+            materials: Array.from(groupMap.get(grp)).sort()
+        });
+    });
+
+    if (ungroupedMats.size > 0) {
+        if (structuredList.length > 0) {
+             structuredList.push({
+                 group: "Ungrouped",
+                 materials: Array.from(ungroupedMats).sort()
+             });
+        }
+    }
+    
+    // Extract deep material data for property panel initialization
+    const materialDataMap = {};
+    scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => {
+                if (m.name && !materialDataMap[m.name]) {
+                    const extractTexture = (tex) => {
+                        return getTextureSource(tex);
+                    };
+
+                    materialDataMap[m.name] = {
+                        color: '#' + m.color.getHexString(),
+                        metallic: m.metalness !== undefined ? m.metalness * 100 : 0,
+                        roughness: m.roughness !== undefined ? m.roughness * 100 : 50,
+                        opacity: m.opacity !== undefined ? m.opacity * 100 : 100,
+                        scale: (m.map && m.map.repeat) ? Math.round(100 / (m.map.repeat.x || 1)) : 100,
+                        maps: {
+                            map: extractTexture(m.map),
+                            normalMap: extractTexture(m.normalMap),
+                            roughnessMap: extractTexture(m.roughnessMap),
+                            metalnessMap: extractTexture(m.metalnessMap),
+                            emissiveMap: extractTexture(m.emissiveMap),
+                            aoMap: extractTexture(m.aoMap),
+                            bumpMap: extractTexture(m.bumpMap)
+                        }
+                    };
+                }
+            });
+        }
+    });
+    
+    if (structuredList.length === 0) {
+         if (typeof setMaterialList === 'function') setMaterialList(Array.from(ungroupedMats).sort(), materialDataMap);
+    } else {
+         if (ungroupedMats.size > 0 && !structuredList.find(x => x.group === "Ungrouped")) {
+             structuredList.push({
+                 group: "Models", // Better name than Ungrouped
+                 materials: Array.from(ungroupedMats).sort()
+             });
+         }
+         if (typeof setMaterialList === 'function') setMaterialList(structuredList, materialDataMap);
+    }
+
+
+    if (typeof setModelStats === 'function') {
+        setModelStats({
+            vertexCount: vertCount.toLocaleString(),
+            polygonCount: Math.round(polyCount).toLocaleString(),
+            materialCount: processedMaterials.size,
+            dimensions: `${Math.round(size.x * 100) / 100} X ${Math.round(size.y * 100) / 100} X ${Math.round(size.z * 100) / 100} unit`
+        });
+    }
+
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene]);
+
+  // 2. Wireframe Update Effect
+  useLayoutEffect(() => {
+      if (!scene) return;
+      meshIndexRef.current.forEach(meshes => {
+          meshes.forEach(child => {
+              if (child.isMesh && child.material) {
+                  if (Array.isArray(child.material)) {
+                      child.material.forEach(m => m.wireframe = wireframe);
+                  } else {
+                      child.material.wireframe = wireframe;
+                  }
+              }
+          });
+      });
+  }, [scene, wireframe]);
+
+  // 3. Material Highlight Effect
+  useEffect(() => {
+    if (!scene || !selectedMaterial) return;
+    
+    // Skip blink if explicitly requested (e.g. during auto-selection after deletion)
+    if (selectedMaterial.noBlink) return;
+
+    const timeouts = [];
+    
+    const targetName = selectedMaterial.name;
+    const targetParentGroup = selectedMaterial.parentGroup;
+    const isGroup = selectedMaterial.isGroup;
+    
+    const isThisModelGroup = targetName === modelName;
+    const isScene = targetName === "Scene";
+
+    let modelIsActive = true;
+    if (targetParentGroup && targetParentGroup !== modelName) modelIsActive = false;
+    if (isGroup && !isThisModelGroup && !isScene) modelIsActive = false;
+    
+    const isFullModelSelect = isScene || isThisModelGroup;
+
+    const FLASH_COLOR = new THREE.Color("#ff0000"); // Red blink
+    const FLASH_INTENSITY = 2.5; 
+
+    const groupMaterials = (isGroup && selectedMaterial.materials) ? selectedMaterial.materials : [];
+
+    const processHighlight = (m) => {
+        if (!m.emissive) return;
+
+        let isTarget = false;
+        if (modelIsActive) {
+             if (isFullModelSelect) {
+                  isTarget = true;
+             } else if (isGroup) {
+                  isTarget = groupMaterials.includes(m.name);
+             } else {
+                  isTarget = m.name === targetName;
+             }
+        }
+
+        if (isTarget) {
+            if (!m.userData.isFlashing) {
+                if (m.emissive && typeof m.emissive.clone === 'function') {
+                    m.userData.originalEmissive = m.emissive.clone();
+                    m.userData.originalIntensity = m.emissiveIntensity;
+                }
+            }
+            
+            m.userData.isFlashing = true;
+
+            // Triple Blink Sequence
+            m.emissive.copy(FLASH_COLOR);
+            m.emissiveIntensity = FLASH_INTENSITY; 
+
+            timeouts.push(setTimeout(() => {
+                if (m.userData.isFlashing) m.emissiveIntensity = 0;
+            }, 100));
+
+            timeouts.push(setTimeout(() => {
+                if (m.userData.isFlashing) {
+                    if (m.emissive) m.emissive.copy(FLASH_COLOR);
+                    m.emissiveIntensity = FLASH_INTENSITY;
+                }
+            }, 200));
+
+            timeouts.push(setTimeout(() => {
+                if (m.userData.isFlashing) m.emissiveIntensity = 0;
+            }, 300));
+
+            timeouts.push(setTimeout(() => {
+                if (m.userData.isFlashing) {
+                    if (m.emissive) m.emissive.copy(FLASH_COLOR);
+                    m.emissiveIntensity = FLASH_INTENSITY;
+                }
+            }, 400));
+
+            timeouts.push(setTimeout(() => {
+                    if (m.emissive) {
+                        if (typeof m.emissive.set === 'function') m.emissive.set(1, 1, 1); 
+                        else m.emissive.setRGB(1, 1, 1);
+                    }
+                    m.emissiveIntensity = 0; 
+                    m.userData.isFlashing = false;
+            }, 500)); 
+
+        } else {
+            if (m.userData.isFlashing) {
+                if (m.emissive) {
+                    if (typeof m.emissive.set === 'function') m.emissive.set(1, 1, 1);
+                    else m.emissive.setRGB(1, 1, 1);
+                }
+                m.emissiveIntensity = 0;
+                m.userData.isFlashing = false;
+            }
+        }
+    };
+
+    meshIndexRef.current.forEach(meshes => {
+        meshes.forEach(child => {
+            if (child.isMesh && child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(processHighlight);
+                } else {
+                     processHighlight(child.material);
+                }
+            }
+        });
+    });
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [scene, selectedMaterial, modelName]);
+
+  // 3.5. Apply Material Settings (Factor Adjustment)
+  // 4. Determine Transform Target
+  const [transformTarget, setTransformTarget] = useState(null);
+  
+  // Use Ref to access latest selection inside effects without triggering them
+  const selectedMaterialRef = React.useRef(selectedMaterial);
+  selectedMaterialRef.current = selectedMaterial;
+
+  // 3.5. Apply Material Settings (Factor Adjustment - Scope Aware)
+  // 3.5. New Approach: Split Load (Selection -> UI) and Apply (UI -> Material)
+
+  // Use a ref to access the sync function without triggering effects
+  const onUpdateMaterialSettingRef = React.useRef(onUpdateMaterialSetting);
+  useEffect(() => {
+      onUpdateMaterialSettingRef.current = onUpdateMaterialSetting;
+  });
+
+  // A. Load Settings when Selection Changes
+  useEffect(() => {
+    if (!scene) return;
+    
+    const selMat = selectedMaterial;
+    const targetMatName = selMat ? selMat.name : (modelName || "Scene");
+    const isFullModel = !selMat || targetMatName === modelName || targetMatName === "Scene";
+
+    let foundMat = null;
+    if (!isFullModel) {
+        scene.traverse((child) => {
+            if (foundMat) return;
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                for (const m of materials) {
+                    if (m.name === targetMatName) {
+                        foundMat = m;
+                        break;
+                    }
+                }
+            }
+        });
+    } else {
+        // For Full Model, we take properties from the first material found as a baseline
+        scene.traverse((child) => {
+            if (foundMat) return;
+            if (child.isMesh && child.material) {
+                 foundMat = Array.isArray(child.material) ? child.material[0] : child.material;
+            }
+        });
+    }
+
+    if (foundMat) {
+        const m = foundMat;
+
+        const safeUpdate = (key, val) => {
+            // Do not sync emissive properties to UI while the material is flashing red/white
+            // to avoid overwriting user settings with temporary highlight colors.
+            if (m.userData.isFlashing && (key === 'emissiveColor' || key === 'emissiveIntensity')) return;
+            
+            if (onUpdateMaterialSettingRef.current) {
+                onUpdateMaterialSettingRef.current(key, val, true); // true = sync from model
+            }
+        };
+
+        // Sync basic properties
+        if (m.color && typeof m.color.getHexString === 'function') {
+            safeUpdate('color', '#' + m.color.getHexString());
+        }
+        
+        if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+            safeUpdate('metallic', Math.round((m.metalness || 0) * 100));
+            safeUpdate('roughness', Math.round((m.roughness || 0) * 100));
+        } else if (m.isMeshPhongMaterial) {
+            safeUpdate('metallic', Math.round((m.shininess || 0) / 100 * 100));
+            safeUpdate('roughness', 0);
+        }
+
+        if (m.opacity !== undefined) {
+            safeUpdate('alpha', Math.round(m.opacity * 100));
+        }
+
+        // Sync intensity and emissive
+        safeUpdate('colorIntensity', 100); 
+        if (m.emissiveIntensity !== undefined) {
+            safeUpdate('emissiveIntensity', Math.round(m.emissiveIntensity * 100));
+        }
+        if (m.emissive && typeof m.emissive.getHexString === 'function') {
+            safeUpdate('emissiveColor', '#' + m.emissive.getHexString());
+        }
+
+        // Sync scales - ensure symmetry with Apply effect
+        if (m.normalMap && m.normalScale) {
+            safeUpdate('normal', Math.round(m.normalScale.x * 100));
+        }
+        
+        // Bump/Disp scale sync
+        if (m.displacementMap && m.displacementScale !== undefined) {
+            safeUpdate('bump', Math.round(m.displacementScale * 100));
+        } else if (m.bumpMap && m.bumpScale !== undefined) {
+            safeUpdate('bump', Math.round(m.bumpScale / 10 * 100));
+        }
+
+        // Texture transformations
+        const tex = m.map || m.normalMap || m.roughnessMap;
+        if (tex) {
+            safeUpdate('scale', Math.round(tex.repeat.x * 100));
+            safeUpdate('rotation', Math.round(tex.rotation * (180 / Math.PI)));
+            safeUpdate('offset', { x: tex.offset.x * 100, y: tex.offset.y * 100 });
+        } else {
+            // Reset to defaults in UI if no texture is present on the selected material
+            safeUpdate('scale', 100);
+            safeUpdate('rotation', 0);
+            safeUpdate('offset', { x: 0, y: 0 });
+        }
+
+        // Sync applied texture info if available
+        if (m.userData.appliedTexture) {
+            safeUpdate('appliedTexture', m.userData.appliedTexture);
+        } else {
+            safeUpdate('appliedTexture', null);
+        }
+    }
+
+    // Capture signature to allow B effect to run safely
+    const sig = `${modelName || ''}_${selMat ? (selMat.uuid || selMat.name) : 'FULL'}`;
+    setSyncedSelectionSignature(sig);
+
+  }, [selectedMaterial, scene, modelName]); 
+
+  // B. Apply Settings when UI changes
+  useEffect(() => {
+    if (!scene || !materialSettings) return;
+
+    const selMat = selectedMaterial; 
+    const targetMatName = selMat ? selMat.name : (modelName || "Scene");
+    
+    // Guard: Prevent applying stale material settings if the selection has changed 
+    // but the UI hasn't synced with the model's current state yet.
+    const currentSig = `${modelName || ''}_${selMat ? (selMat.uuid || selMat.name) : 'FULL'}`;
+    if (syncedSelectionSignature && syncedSelectionSignature !== currentSig) {
+        return;
+    }
+
+    const isFullModel = !selMat || targetMatName === modelName || targetMatName === "Scene";
+    
+    const alpha = (materialSettings.alpha ?? 100) / 100;
+    const metallic = (materialSettings.metallic ?? 0) / 100;
+    const roughness = (materialSettings.roughness ?? 50) / 100;
+    const normalScaleVal = (materialSettings.normal ?? 100) / 100;
+    const bumpScaleVal = (materialSettings.bump ?? 100) / 100;
+    const color = materialSettings.color;
+    const emissiveColor = materialSettings.emissiveColor || '#000000';
+    const emissiveIntensity = (materialSettings.emissiveIntensity ?? 0) / 100;
+    
+    const texScaleX = 100 / (materialSettings.scale || 0.01);
+    const texScaleY = 100 / (materialSettings.scale || 0.01);
+    const texRotation = (materialSettings.rotation ?? 0) * (Math.PI / 180);
+    const texOffsetX = (materialSettings.offset?.x ?? 0) / 100;
+    const texOffsetY = (materialSettings.offset?.y ?? 0) / 100;
+
+    const galleryTexture = materialSettings.appliedTexture;
+    const isGalleryTexture = !!galleryTexture;
+
+    scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            
+            materials.forEach(m => {
+                let isMatch = false;
+                if (selMat && !isFullModel) {
+                     if (selMat.isGroup && Array.isArray(selMat.materials)) {
+                         isMatch = selMat.materials.includes(m.name);
+                     } else {
+                         isMatch = m.name === targetMatName;
+                     }
+                } else if (isFullModel) {
+                     // In Full Model mode, we only apply overrides if they are explicitly enabled 
+                     // (e.g. user moved a slider). This prevents broad clobbering of different 
+                     // materials on selection change or project load.
+                     isMatch = materialSettings.useFactorColor;
+                }
+
+                if (isMatch) {
+                    // 1. Basic Material Factors
+                    if (color && m.color && typeof m.color.set === 'function') {
+                        const intensity = (materialSettings.colorIntensity ?? 100) / 100;
+                        const finalColor = new THREE.Color(color);
+                        finalColor.multiplyScalar(intensity);
+                        m.color.copy(finalColor);
+                    }
+
+                    if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+                        m.metalness = metallic;
+                        m.roughness = roughness;
+                        
+                        // Reflection & AO
+                        const reflection = Math.max(0, Math.min(1, (materialSettings.reflection ?? 50) / 100)); 
+                        const aoIntensity = (materialSettings.ao ?? 100) / 100;
+                        m.envMapIntensity = reflection;
+                        if (m.aoMap) m.aoMapIntensity = aoIntensity;
+
+                        // Physical Material specific refinements
+                        if (m.isMeshPhysicalMaterial) {
+                            const spec = Math.max(0, Math.min(1, (materialSettings.specular ?? 50) / 100));
+                            if (m.specularIntensity !== undefined) m.specularIntensity = spec;
+                            if (m.clearcoat !== undefined) m.clearcoat = Math.max(0, Math.min(1, (materialSettings.softness ?? 50) / 100));
+                        }
+                    }
+
+                    // Improved transparency logic: 
+                    // 1. Always set depthWrite to true to prevent see-through artifacts.
+                    // 2. Use alphaTest to help with depth sorting.
+                    // 3. Only preserve transparency in "Full Model" mode for likely glass/window parts.
+                    const isLikelyGlass = m.name?.toLowerCase().includes('glass') || 
+                                          m.name?.toLowerCase().includes('window') || 
+                                          (m.userData.originalOpacity !== undefined && m.userData.originalOpacity < 0.95);
+
+                    // Final transparency & depth logic
+                    const isTransparent = alpha < 0.999 || !!m.alphaMap;
+                    m.transparent = isTransparent;
+                    m.opacity = alpha;
+                    
+                    // Critical: depthWrite MUST be false for semi-transparent materials 
+                    // to prevent objects behind them from being discarded.
+                    m.depthWrite = !isTransparent;
+                    m.alphaTest = 0; 
+                    m.needsUpdate = true;
+                    
+                    if (m.emissive && typeof m.emissive.set === 'function') {
+                        m.emissive.set(emissiveColor);
+                        m.emissiveIntensity = emissiveIntensity;
+                    }
+
+                    // 2. Map Scales
+                    if (m.normalMap && m.normalScale) {
+                        m.normalScale.set(normalScaleVal, normalScaleVal);
+                    }
+                    if (m.displacementMap) {
+                        m.displacementScale = bumpScaleVal;
+                    }
+                    if (m.bumpMap) {
+                        m.bumpScale = bumpScaleVal * 10;
+                    }
+
+                    // 3. Texture Removal Check
+                    const configTextureId = materialSettings.appliedTexture?.id || materialSettings.appliedTexture?._id || null;
+                    const matTextureId = m.userData.appliedTextureId || null;
+                    const isNone = configTextureId === 'none';
+
+                    if (matTextureId && (!configTextureId || isNone)) {
+                         // Texture was stripped from state (e.g. Undo) or 'None' selected, so strip from material
+                         m.map = null;
+                         m.normalMap = null;
+                         m.roughnessMap = null;
+                         m.metalnessMap = null;
+                         m.aoMap = null;
+                         m.displacementMap = null;
+                         m.bumpMap = null;
+                         m.alphaMap = null;
+                         
+                         // Restore original maps if they existed
+                         if (m.userData.originalMap) m.map = m.userData.originalMap;
+                         if (m.userData.originalNormalMap) m.normalMap = m.userData.originalNormalMap;
+                         if (m.userData.originalAlphaMap) m.alphaMap = m.userData.originalAlphaMap;
+                         
+                         m.userData.appliedTexture = null;
+                         m.userData.appliedTextureId = null;
+                         m.needsUpdate = true;
+                    }
+
+                    // 4. Texture Transformations (Syncing logic moved to dedicated effect)
+
+                    // 4. Texture Transformations
+                    // Only apply if the current mesh matches the selection scope (isMatch).
+                    // This avoids forcing the first material's scale/offset onto everything 
+                    // when simply switching to "Full Model" view.
+                    if (isMatch) {
+                        [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.aoMap, m.displacementMap, m.bumpMap, m.alphaMap, m.emissiveMap].forEach(tex => {
+                            if (tex) {
+                                if (tex.repeat) tex.repeat.set(texScaleX, texScaleY);
+                                if (tex.offset) tex.offset.set(texOffsetX, texOffsetY);
+                                if (tex.rotation !== undefined) tex.rotation = texRotation;
+                                tex.center.set(0.5, 0.5); 
+                            }
+                        });
+                    }
+
+                    // Restore original map if it exists and no custom texture is applied
+                    if (!m.userData.appliedTextureId && !m.map && m.userData.originalMap) {
+                        m.map = m.userData.originalMap;
+                        m.needsUpdate = true;
+                    }
+                    if (!m.userData.appliedTextureId && !m.alphaMap && m.userData.originalAlphaMap) {
+                        m.alphaMap = m.userData.originalAlphaMap;
+                        m.needsUpdate = true;
+                    }
+                    
+                    if (!m.userData.originalColor) {
+                        m.userData.originalColor = m.color.clone();
+                    }
+
+                    m.needsUpdate = true;
+                }
+            });
+        }
+    });
+  }, [scene, materialSettings, modelName, selectedMaterial, resetKey, syncedSelectionSignature]);
+
+  // C. Sync Map URLs from State (Independent from high-frequency slider interaction)
+  useEffect(() => {
+    if (!scene || !materialSettings?.maps) return;
+
+    const targetMatName = selectedMaterial ? selectedMaterial.name : (modelName || "Scene");
+    const isFullModel = !selectedMaterial || targetMatName === modelName || targetMatName === "Scene";
+    const stateMaps = materialSettings.maps;
+    const isNone = materialSettings.appliedTexture?.id === 'none';
+
+    if (isNone) return;
+
+    const texScaleX = 100 / (materialSettings.scale || 0.01);
+    const texScaleY = 100 / (materialSettings.scale || 0.01);
+
+    const applyToMeshes = (meshes) => {
+        meshes.forEach(child => {
+            if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(m => {
+                    let isMatch = false;
+                    if (selectedMaterial && !isFullModel) {
+                         if (selectedMaterial.isGroup && Array.isArray(selectedMaterial.materials)) {
+                             isMatch = selectedMaterial.materials.includes(m.name);
+                         } else {
+                             isMatch = m.name === targetMatName;
+                         }
+                    } else if (isFullModel) {
+                         isMatch = materialSettings.useFactorColor;
+                    }
+
+                    if (isMatch) {
+                        const syncMap = (mapProp, stateUrl, isColor = false) => {
+                            if (stateUrl && (!m[mapProp] || m[mapProp].userData?.url !== stateUrl)) {
+                                // Performance: Use global cache for instant texture application
+                                const cacheKey = `${stateUrl}_${isColor}`;
+                                if (globalTextureCache.has(cacheKey)) {
+                                    const cachedTex = globalTextureCache.get(cacheKey);
+                                    m[mapProp] = cachedTex;
+                                    if (m[mapProp].repeat) m[mapProp].repeat.set(texScaleX, texScaleY);
+                                    m.needsUpdate = true;
+                                    return;
+                                }
+
+                                sharedTextureLoader.load(stateUrl, (tex) => {
+                                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                                    tex.flipY = false;
+                                    tex.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+                                    tex.userData.url = stateUrl;
+                                    tex.repeat.set(texScaleX, texScaleY);
+                                    globalTextureCache.set(cacheKey, tex);
+                                    m[mapProp] = tex;
+                                    m.needsUpdate = true;
+                                });
+                            }
+                        };
+
+                        if (stateMaps.map) syncMap('map', stateMaps.map, true);
+                        if (stateMaps.normalMap) syncMap('normalMap', stateMaps.normalMap);
+                        if (stateMaps.roughnessMap) syncMap('roughnessMap', stateMaps.roughnessMap);
+                        if (stateMaps.metalnessMap) syncMap('metalnessMap', stateMaps.metalnessMap);
+                        if (stateMaps.aoMap) syncMap('aoMap', stateMaps.aoMap);
+                        if (stateMaps.displacementMap) syncMap('displacementMap', stateMaps.displacementMap);
+                        if (stateMaps.emissiveMap) syncMap('emissiveMap', stateMaps.emissiveMap, true);
+                    }
+                });
+            }
+        });
+    };
+
+    if (isFullModel) {
+        if (!materialSettings.useFactorColor) return;
+        meshIndexRef.current.forEach(applyToMeshes);
+    } else if (targetMatName && meshIndexRef.current.has(targetMatName)) {
+        applyToMeshes(meshIndexRef.current.get(targetMatName));
+    }
+  }, [scene, materialSettings?.maps, selectedMaterial, modelName]);
+
+  // C. Handle overall visibility
+  useEffect(() => {
+    if (!scene) return;
+    
+    scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+            let isHidden = false;
+            if (hiddenMaterials) {
+                if (Array.isArray(child.material)) {
+                    isHidden = child.material.some(m => hiddenMaterials.has(m.name));
+                } else {
+                    isHidden = hiddenMaterials.has(child.material.name);
+                }
+            }
+            child.visible = !isHidden;
+        }
+    });
+  }, [scene, hiddenMaterials]);
+
+  // Sync transformValues (from UI) to Object
+  useEffect(() => {
+      if (!transformTarget || !transformValues || !transformValues.position || !transformValues.rotation || !transformValues.scale) return;
+      
+      // Apply position
+      transformTarget.position.set(
+          transformValues.position.x, 
+          transformValues.position.y, 
+          transformValues.position.z
+      );
+      
+      // Apply rotation
+      transformTarget.rotation.set(
+          transformValues.rotation.x, 
+          transformValues.rotation.y, 
+          transformValues.rotation.z
+      );
+      
+      // Apply scale
+      transformTarget.scale.set(
+          transformValues.scale.x, 
+          transformValues.scale.y, 
+          transformValues.scale.z
+      );
+
+      // Multi-mesh Sync: If this is a material-based selection, sync followers.
+      // We only sync if the current transformTarget is the "leader" (the first mesh in relatedMeshes).
+      if (relatedMeshesRef.current.length > 1 && !isSyncingRef.current && transformTarget === relatedMeshesRef.current[0]) {
+          isSyncingRef.current = true;
+          try {
+              transformTarget.updateMatrixWorld(true);
+              const leaderWorldMatrix = transformTarget.matrixWorld;
+
+              relatedMeshesRef.current.forEach(follower => {
+                  if (follower === transformTarget) return;
+                  
+                  const relativeMatrix = followerOffsetsRef.current.get(follower.uuid);
+                  if (relativeMatrix) {
+                      // follower.matrixWorld = leader.matrixWorld * relativeMatrix
+                      const newWorldMatrix = new THREE.Matrix4().multiplyMatrices(leaderWorldMatrix, relativeMatrix);
+                      
+                      // Apply to follower (maintaining its own parentage)
+                      const parentInverse = new THREE.Matrix4().copy(follower.parent.matrixWorld).invert();
+                      const newLocalMatrix = new THREE.Matrix4().multiplyMatrices(parentInverse, newWorldMatrix);
+                      
+                      newLocalMatrix.decompose(follower.position, follower.quaternion, follower.scale);
+                      follower.updateMatrix();
+                  }
+              });
+          } finally {
+              isSyncingRef.current = false;
+          }
+      }
+      
+  }, [transformTarget, 
+      transformValues?.position?.x, transformValues?.position?.y, transformValues?.position?.z, 
+      transformValues?.rotation?.x, transformValues?.rotation?.y, transformValues?.rotation?.z,
+      transformValues?.scale?.x, transformValues?.scale?.y, transformValues?.scale?.z]);
+  
+
+  // 3.5 Capture Initial Transforms (runs once per scene load)
+  useEffect(() => {
+    if (!scene) return;
+    
+    const capture = (obj) => {
+        if (!obj.userData.originalTransform) {
+            obj.userData.originalTransform = {
+                position: obj.position.clone(),
+                rotation: obj.rotation.clone(),
+                scale: obj.scale.clone()
+            };
+        }
+    };
+
+    capture(scene);
+    scene.traverse(capture);
+  }, [scene]);
+
+  useEffect(() => {
+    if (!scene) return;
+
+    const targetName = selectedMaterial ? selectedMaterial.name : null;
+    const targetUuid = selectedMaterial ? selectedMaterial.uuid : null;
+    const targetParentGroup = selectedMaterial ? selectedMaterial.parentGroup : null;
+    const isGroup = selectedMaterial ? selectedMaterial.isGroup : false;
+    
+    // 4. Determine Transform Target
+    if (targetParentGroup && targetParentGroup !== modelName && targetParentGroup !== "Scene") {
+        // If the selection belongs to a different model entirely, we ignore it.
+        // We check if targetParentGroup matches ANY of our internal group names.
+        // This is a safety check to avoid multiple models fighting for the same gizmo.
+    }
+
+    if (!targetName || targetName === "Scene") {
+        setTransformTarget(null);
+        relatedMeshesRef.current = [];
+        followerOffsetsRef.current.clear();
+        return;
+    }
+
+    // Default to Full Model (modelGroup) if Model Name selected
+    if (targetName === modelName) {
+        relatedMeshesRef.current = [];
+        followerOffsetsRef.current.clear();
+        
+        if (modelGroup) {
+            setTransformTarget(modelGroup);
+            
+            // Ensure UI stays in sync with Full Model transform
+            if (typeof onTransformChange === 'function') {
+                 onTransformChange({
+                    position: modelGroup.position,
+                    rotation: modelGroup.rotation,
+                    scale: modelGroup.scale,
+                    original: modelGroup.userData.originalTransform || {
+                        position: modelGroup.position.clone(),
+                        rotation: modelGroup.rotation.clone(),
+                        scale: modelGroup.scale.clone()
+                    }
+                });
+            }
+        }
+        return;
+    }
+
+    // Priority 0: Group Selection (Handle both physical Scene groups and UI-only Material groups)
+    if (isGroup) {
+        // A: Check for physical group in scene
+        let physicalGroup = null;
+        scene.traverse((child) => {
+            if (physicalGroup) return;
+            if (child.isGroup && child.name === targetName) {
+                physicalGroup = child;
+            }
+        });
+        
+        if (physicalGroup) {
+            setTransformTarget(physicalGroup);
+            if (typeof onTransformChange === 'function') {
+                onTransformChange({
+                    position: physicalGroup.position,
+                    rotation: physicalGroup.rotation,
+                    scale: physicalGroup.scale,
+                    original: physicalGroup.userData.originalTransform || {
+                        position: physicalGroup.position.clone(),
+                        rotation: physicalGroup.rotation.clone(),
+                        scale: physicalGroup.scale.clone()
+                    }
+                });
+            }
+            return; 
+        }
+
+        // B: Check for UI-only group (e.g., Multiple Selection or Material Folder)
+        const groupMats = selectedMaterial.materials || [];
+        if (groupMats.length > 0) {
+            const allMatches = [];
+            scene.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const m = child.material;
+                    const mats = Array.isArray(m) ? m : [m];
+                    if (mats.some(mat => groupMats.includes(mat.name))) {
+                        allMatches.push(child);
+                    }
+                }
+            });
+
+            if (allMatches.length > 0) {
+                const leader = allMatches[0];
+                setTransformTarget(leader);
+                relatedMeshesRef.current = allMatches;
+
+                // Pre-calculate relative world matrices for all followers
+                if (allMatches.length > 1) {
+                    leader.updateMatrixWorld(true);
+                    const leaderWorldInverse = new THREE.Matrix4().copy(leader.matrixWorld).invert();
+                    
+                    const offsets = new Map();
+                    allMatches.forEach(mesh => {
+                        if (mesh === leader) return;
+                        mesh.updateMatrixWorld(true);
+                        const relativeMatrix = new THREE.Matrix4().multiplyMatrices(leaderWorldInverse, mesh.matrixWorld);
+                        offsets.set(mesh.uuid, relativeMatrix);
+                    });
+                    followerOffsetsRef.current = offsets;
+                } else {
+                    followerOffsetsRef.current = new Map();
+                }
+
+                if (typeof onTransformChange === 'function') {
+                    onTransformChange({
+                        position: leader.position,
+                        rotation: leader.rotation,
+                        scale: leader.scale,
+                        original: leader.userData.originalTransform || {
+                            position: leader.position.clone(),
+                            rotation: leader.rotation.clone(),
+                            scale: leader.scale.clone()
+                        }
+                    });
+                }
+                return;
+            }
+        }
+    }
+
+    // Otherwise, try to find the mesh with the selected material
+    let foundMesh = null;
+
+    // Priority 1: UUID Match
+    if (targetUuid) {
+        scene.traverse((child) => {
+            if (foundMesh) return;
+            if (child.uuid === targetUuid) {
+                foundMesh = child;
+            }
+        });
+    }
+
+    // Priority 2: Name Match
+    if (!foundMesh) {
+        scene.traverse((child) => {
+            if (foundMesh) return;
+            if (child.isMesh && child.material) {
+                 const m = child.material;
+                 if (Array.isArray(m)) {
+                     if (m.some(mat => mat.name === targetName)) foundMesh = child;
+                 } else {
+                     if (m.name === targetName) foundMesh = child;
+                 }
+            }
+        });
+    }
+
+    // --- Multi-Mesh Identification ---
+    // If we found a mesh, also find all other meshes that share the same material
+    const allMatches = [];
+    if (foundMesh && !isGroup && targetName !== modelName) {
+        scene.traverse((child) => {
+            if (child.isMesh && child.material) {
+                const m = child.material;
+                let hasMatch = false;
+                if (Array.isArray(m)) {
+                    hasMatch = m.some(mat => mat.name === targetName);
+                } else {
+                    hasMatch = m.name === targetName;
+                }
+                if (hasMatch) allMatches.push(child);
+            }
+        });
+    }
+    relatedMeshesRef.current = allMatches;
+
+    // Pre-calculate relative world matrices for all followers
+    if (allMatches.length > 1) {
+        const leader = foundMesh;
+        leader.updateMatrixWorld(true);
+        const leaderWorldInverse = new THREE.Matrix4().copy(leader.matrixWorld).invert();
+        
+        const offsets = new Map();
+        allMatches.forEach(mesh => {
+            if (mesh === leader) return;
+            mesh.updateMatrixWorld(true);
+            // relative = leaderInverse * meshWorld
+            const relative = new THREE.Matrix4().multiplyMatrices(leaderWorldInverse, mesh.matrixWorld);
+            offsets.set(mesh.uuid, relative);
+        });
+        followerOffsetsRef.current = offsets;
+    } else {
+        followerOffsetsRef.current.clear();
+    }
+
+    // Set the target to the found mesh. 
+    // IMPORTANT: DO NOT fallback to modelGroup here. If a material was selected but no mesh was found,
+    // we should select nothing for transformation (null), rather than the whole object.
+    setTransformTarget(foundMesh);
+    
+    // Update transform values initially
+    if (typeof onTransformChange === 'function') {
+        const target = foundMesh;
+        if (target) {
+             onTransformChange({
+                position: target.position,
+                rotation: target.rotation,
+                scale: target.scale,
+                original: target.userData.originalTransform || {
+                    position: target.position.clone(),
+                    rotation: target.rotation.clone(),
+                    scale: target.scale.clone()
+                }
+            });
+        }
+    }
+  }, [scene, selectedMaterial, modelName, onTransformChange, modelGroup]);
+
+  // 5. Scene-Wide Reset Effect
+  useEffect(() => {
+    if (sceneResetTrigger > 0 && scene) {
+        // Reset the root scene object
+        if (scene.userData.originalTransform) {
+            const orig = scene.userData.originalTransform;
+            scene.position.copy(orig.position);
+            scene.rotation.copy(orig.rotation);
+            scene.scale.copy(orig.scale);
+            scene.updateMatrix();
+        }
+
+        // Reset all individual objects that have been moved
+        meshIndexRef.current.forEach(meshes => {
+            meshes.forEach(child => {
+                 if (child.userData && child.userData.originalTransform) {
+                     const original = child.userData.originalTransform;
+                     child.position.copy(original.position);
+                     child.rotation.copy(original.rotation);
+                     child.scale.copy(original.scale);
+                     child.updateMatrix();
+                     child.updateMatrixWorld(true);
+                 }
+            });
+        });
+
+        // Reset the main model group wrapper if it was moved
+        if (modelGroup) {
+             // Reset its transform
+             if (modelGroup.userData.originalTransform) {
+                 const original = modelGroup.userData.originalTransform;
+                 modelGroup.position.copy(original.position);
+                 modelGroup.rotation.copy(original.rotation);
+                 modelGroup.scale.copy(original.scale);
+                 modelGroup.updateMatrix();
+             } else {
+                 modelGroup.position.set(0,0,0);
+                 modelGroup.rotation.set(0,0,0);
+                 modelGroup.scale.set(1,1,1);
+             }
+             modelGroup.updateMatrixWorld(true);
+        }
+
+        // Reset the normalization states to exact captured values
+        if (scene.userData.normalization) {
+            setPosition(scene.userData.normalization.position);
+            setScale(scene.userData.normalization.scale);
+        }
+    }
+  }, [sceneResetTrigger, scene, modelGroup]);
+
+  // 6. UV Unwrap Logic (Auto Default)
+  const applyBoxUV = (mesh) => {
+      if (!mesh.geometry) return;
+      
+      const geometry = mesh.geometry;
+      geometry.computeBoundingBox();
+      
+      const { min, max } = geometry.boundingBox;
+      const range = new THREE.Vector3().subVectors(max, min);
+      if(range.x === 0) range.x = 1;
+      if(range.y === 0) range.y = 1;
+      if(range.z === 0) range.z = 1;
+
+      const posAttribute = geometry.attributes.position;
+      if (!geometry.attributes.normal) geometry.computeVertexNormals();
+      const normalAttribute = geometry.attributes.normal;
+
+      const uvAttribute = geometry.attributes.uv || new THREE.BufferAttribute(new Float32Array(posAttribute.count * 2), 2);
+      
+      for (let i = 0; i < posAttribute.count; i++) {
+          const x = posAttribute.getX(i);
+          const y = posAttribute.getY(i);
+          const z = posAttribute.getZ(i);
+          
+          const nx = Math.abs(normalAttribute.getX(i));
+          const ny = Math.abs(normalAttribute.getY(i));
+          const nz = Math.abs(normalAttribute.getZ(i));
+          
+          let u = 0, v = 0;
+
+          if (nx >= ny && nx >= nz) {
+              u = (z - min.z) / range.z;
+              v = (y - min.y) / range.y;
+          } else if (ny >= nx && ny >= nz) {
+              u = (x - min.x) / range.x;
+              v = (z - min.z) / range.z;
+          } else {
+              u = (x - min.x) / range.x;
+              v = (y - min.y) / range.y;
+          }
+          
+          uvAttribute.setXY(i, u, v);
+      }
+      
+      geometry.setAttribute('uv', uvAttribute);
+      geometry.attributes.uv.needsUpdate = true;
+      
+      // Re-compute tangents if normal mapping is expected
+      if (geometry.computeTangents && geometry.attributes.normal && geometry.attributes.uv) {
+           try { geometry.computeTangents(); } catch(e) {}
+      }
+  };
+
+  useEffect(() => {
+    if (scene && uvUnwrapTrigger > 0) {
+        const targetMatName = selectedMaterial ? selectedMaterial.name : null;
+        const isFullModel = !targetMatName || (modelName && targetMatName === modelName);
+        const isGroup = selectedMaterial?.isGroup;
+        const groupMats = selectedMaterial?.materials || [];
+
+
+        let modifiedAny = false;
+        
+        const applyToSelection = (meshes) => {
+            meshes.forEach(child => {
+                if (child.isMesh && child.material) {
+                    let shouldApply = false;
+                    
+                    if (isFullModel) {
+                        shouldApply = true;
+                    } else {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        if (isGroup) {
+                             shouldApply = mats.some(m => groupMats.includes(m.name));
+                        } else {
+                             shouldApply = mats.some(m => m.name === targetMatName);
+                        }
+                    }
+                    
+                    if (shouldApply) {
+                        applyBoxUV(child);
+                        modifiedAny = true;
+                    }
+                }
+            });
+        };
+
+        if (isFullModel) {
+            meshIndexRef.current.forEach(applyToSelection);
+        } else if (targetMatName && meshIndexRef.current.has(targetMatName)) {
+            applyToSelection(meshIndexRef.current.get(targetMatName));
+        } else if (isGroup) {
+            groupMats.forEach(mName => {
+                if (meshIndexRef.current.has(mName)) {
+                    applyToSelection(meshIndexRef.current.get(mName));
+                }
+            });
+        }
+
+        if (modifiedAny) {
+            // Since UV unwrapping changes geometry attributes (permanent till reload), 
+            // we treat it as a state change for the history.
+            // We'll push a snapshot of current settings.
+            if (typeof onUpdateMaterialSetting === 'function') {
+                // Trigger a dummy update to force a history push if needed, 
+                // but since this is geometry, we just want a checkpoint.
+                onUpdateMaterialSetting('uvUnwrap', Date.now(), false);
+            }
+        }
+    }
+  }, [uvUnwrapTrigger, scene, selectedMaterial, modelName, onUpdateMaterialSetting]);
+
+
+  return (
+    <>
+         {transformMode && transformTarget && (
+              <TransformControls 
+                 key={transformTarget.uuid}
+                 object={transformTarget} 
+                 mode={transformMode} 
+                 size={0.8} 
+                  space="local" 
+                  onPointerDown={(e) => {
+                      e.stopPropagation();
+                  }}
+                  onChange={() => {
+                     if (typeof onTransformChange === 'function' && transformTarget) {
+                         // Multi-mesh sync during active transform
+                         if (relatedMeshesRef.current.length > 1 && !isSyncingRef.current) {
+                             isSyncingRef.current = true;
+                             try {
+                                 transformTarget.updateMatrixWorld(true);
+                                 const leaderWorldMatrix = transformTarget.matrixWorld;
+
+                                 relatedMeshesRef.current.forEach(follower => {
+                                     if (follower === transformTarget) return;
+                                     
+                                     const relativeMatrix = followerOffsetsRef.current.get(follower.uuid);
+                                     if (relativeMatrix) {
+                                         // follower.matrixWorld = leader.matrixWorld * relativeMatrix
+                                         const newWorldMatrix = new THREE.Matrix4().multiplyMatrices(leaderWorldMatrix, relativeMatrix);
+                                         
+                                         // Apply to follower (maintaining its own parentage)
+                                         // We need to invert the follower's parent's world matrix to get the local matrix
+                                         const parentInverse = new THREE.Matrix4().copy(follower.parent.matrixWorld).invert();
+                                         const newLocalMatrix = new THREE.Matrix4().multiplyMatrices(parentInverse, newWorldMatrix);
+                                         
+                                         newLocalMatrix.decompose(follower.position, follower.quaternion, follower.scale);
+                                         follower.updateMatrix();
+                                     }
+                                 });
+                             } finally {
+                                 isSyncingRef.current = false;
+                             }
+                         }
+
+                         onTransformChange({
+                             position: transformTarget.position,
+                             rotation: transformTarget.rotation,
+                             scale: transformTarget.scale
+                         });
+                     }
+                 }}
+                 onMouseUp={typeof onTransformEnd === 'function' ? onTransformEnd : undefined}
+              />
+         )}
+        <group 
+            ref={setModelGroup}
+            onPointerDown={(e) => {
+                e.stopPropagation();
+                
+                // Identify the specific mesh hit
+                const mesh = e.object;
+                
+
+                // Selection Guard: Ignore selection if the user is clicking on the transformation handles.
+                const intersections = e.intersections;
+                if (intersections && intersections.length > 0) {
+                    const closest = intersections[0].object;
+                    let isClosestPartOfModel = false;
+                    let currClosest = closest;
+                    while (currClosest) {
+                        if (currClosest === scene) {
+                            isClosestPartOfModel = true;
+                            break;
+                        }
+                        currClosest = currClosest.parent;
+                    }
+                    if (!isClosestPartOfModel) return;
+                }
+
+                // Lock selection while transform tools are active to prevent accidental jumping
+                if (transformMode && selectedMaterial) {
+                    return;
+                }
+
+                if (mesh && mesh.isMesh && mesh.material) {
+                    let mat = mesh.material;
+                    if (Array.isArray(mat)) {
+                        if (e.face && e.face.materialIndex !== undefined) {
+                            mat = mat[e.face.materialIndex];
+                        } else {
+                            mat = mat[0];
+                        }
+                    }
+                    if (mat && mat.name && typeof onSelectMaterial === 'function') {
+                        onSelectMaterial({ 
+                            name: mat.name, 
+                            uuid: mesh.uuid, 
+                            parentGroup: modelName,
+                            isShift: e.shiftKey 
+                        });
+                    }
+                }
+            }}
+        >
+            <primitive 
+                object={scene} 
+                scale={scale} 
+                position={position} 
+            />
+        </group>
+    </>
+  );
+}));
+
+export default GenericModel;
