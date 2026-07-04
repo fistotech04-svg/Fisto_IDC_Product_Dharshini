@@ -85,7 +85,7 @@ const GifEditor = ({
 
   const [filters, setFilters] = useState({ exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, highlights: 0, shadows: 0 });
   const [radius, setRadius] = useState({ tl: 0, tr: 0, br: 0, bl: 0 });
-  const [isRadiusLinked, setIsRadiusLinked] = useState(false);
+  const [isRadiusLinked, setIsRadiusLinked] = useState(true);
   const [activeEffects, setActiveEffects] = useState([]);
   const [effectSettings, setEffectSettings] = useState({
     'Drop Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
@@ -241,8 +241,10 @@ const GifEditor = ({
     let dashLen = 5, dashGap = 5;
     if (isDashed && strokeArray !== 'none') {
       const parts = strokeArray.split(',');
-      dashLen = parseInt(parts[0]) || 5;
-      dashGap = parseInt(parts[1] || parts[0]) || 5;
+      const parsedLen = parseInt(parts[0]);
+      dashLen = isNaN(parsedLen) ? 5 : parsedLen;
+      const parsedGap = parts.length > 1 ? parseInt(parts[1]) : parsedLen;
+      dashGap = isNaN(parsedGap) ? dashLen : parsedGap;
     }
     const dashPos = selectedElement.getAttribute('data-stroke-position') || 'Center';
     const dashCap = selectedElement.getAttribute('stroke-linecap') || 'butt';

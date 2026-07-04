@@ -4190,10 +4190,10 @@ const MainEditor = ({
             if (dir === 'e' || dir === 'w') scaleY = 1;
 
             // Maintain Aspect Ratio for images, text, or if Shift key is held (only for corners, but force for text on all handles to prevent distortion)
-            const isImage = el.getAttribute('data-type') === 'image' || el.tagName.toLowerCase() === 'image';
+            const isImage = el.getAttribute('data-type') === 'image' || el.tagName.toLowerCase() === 'image' || el.getAttribute('data-type') === 'video' || el.getAttribute('data-type') === 'gif';
             const isText = el.getAttribute('data-type') === 'text' || el.tagName.toLowerCase() === 'text';
             const isForeignObject = el.tagName.toLowerCase() === 'foreignobject';
-            const isGroup = el.tagName.toLowerCase() === 'g';
+            const isGroup = el.tagName.toLowerCase() === 'g' && !el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group');
             const isCorner = ['nw', 'ne', 'se', 'sw'].includes(dir);
 
             if ((isCorner && (event.shiftKey || isImage || (isText && !isForeignObject))) || (!isCorner && (isText && !isForeignObject))) {
