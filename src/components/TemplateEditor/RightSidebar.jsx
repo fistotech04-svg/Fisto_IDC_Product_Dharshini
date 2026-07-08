@@ -370,15 +370,25 @@ const RightSidebar = ({
           if (parseFloat(y) === 0) y = el.getAttribute('y') || '0';
         }
 
-        const fillStyle = el.getAttribute('fill') || '#000000';
-        const strokeStyle = el.getAttribute('stroke') || 'none';
+        let fillStyle = el.getAttribute('fill') || '#000000';
+        let strokeStyle = el.getAttribute('stroke') || 'none';
+        let strokeWidthStr = el.getAttribute('stroke-width') || el.getAttribute('strokeWidth') || '0';
+
+        if (el.tagName.toLowerCase() === 'foreignobject' && actualEl && actualEl.firstElementChild) {
+          const comp = window.getComputedStyle(actualEl.firstElementChild);
+          if (!el.hasAttribute('fill')) fillStyle = comp.color || fillStyle;
+          if (!el.hasAttribute('stroke') && comp.webkitTextStrokeColor) strokeStyle = comp.webkitTextStrokeColor;
+          if (!el.hasAttribute('stroke-width') && !el.hasAttribute('strokeWidth') && comp.webkitTextStrokeWidth) {
+            strokeWidthStr = parseFloat(comp.webkitTextStrokeWidth).toString();
+          }
+        }
 
         const props = {
           id: selectedLayerId,
           tagName: el.tagName,
           fill: fillStyle,
           stroke: strokeStyle,
-          strokeWidth: el.getAttribute('stroke-width') || '0',
+          strokeWidth: strokeWidthStr,
           strokeDasharray: el.getAttribute('stroke-dasharray') || 'none',
           opacity: el.getAttribute('opacity') || '1',
           fontSize: el.getAttribute('font-size') || '16',
@@ -761,8 +771,8 @@ const RightSidebar = ({
                           }}
                           pages={pages}
                           currentPageVId={pages[activePageIndex]?.v_id || pages[activePageIndex]?.id || ''}
-                          folderName="My Flipbooks"
-                          flipbookName="Untitled"
+                          folderName={location.state?.folderName || folder || 'Recent Book'}
+                          flipbookName={location.state?.flipbookName || 'Untitled Flipbook'}
                         />
                       ) : selectedElementProps?.isText ? (
                         <TextEditor
@@ -964,7 +974,7 @@ const RightSidebar = ({
           /* Animation Mode */
           <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">
             <AnimationPanel
-              selectedElement={(() => {
+              e selectedElement={(() => {
                 if (!selectedLayerId) return null;
                 const container = document.querySelector(`.page-svg-container [id="${selectedLayerId}"]`);
                 if (container) return container;

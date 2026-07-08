@@ -60,23 +60,32 @@ const parseLayersFromSVG = (element) => {
         if (subLayers.length > 0) layer.children = subLayers;
       }
 
-      // VIRTUAL EFFECT LAYERS FOR IMAGE/VIDEO/GIF GROUP
+      // VIRTUAL EFFECT LAYERS FOR IMAGE/VIDEO/GIF GROUP AND TEXT
       const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
         child.getAttribute('data-is-gif-group') === 'true';
 
-      if (isGroup) {
-        const activeEffectsStr = child.getAttribute('data-active-effects') || '';
-        const activeEffects = activeEffectsStr.split(',').filter(Boolean);
+      const isText = child.tagName.toLowerCase() === 'text' || child.tagName.toLowerCase() === 'foreignobject';
+
+      if (isGroup || isText) {
+        let activeEffects = [];
+        
+        if (isGroup) {
+          const activeEffectsStr = child.getAttribute('data-active-effects') || '';
+          activeEffects = activeEffectsStr.split(',').filter(Boolean);
+        } else if (isText) {
+          if (child.getAttribute('data-effect-drop-shadow') === 'true') activeEffects.push('Drop Shadow');
+          if (child.getAttribute('data-effect-inner-shadow') === 'true') activeEffects.push('Inner Shadow');
+        }
 
         const strokeAttr = child.getAttribute('stroke') || child.getAttribute('data-stroke-color');
         const hasStroke = strokeAttr && strokeAttr !== 'none' && strokeAttr !== 'transparent';
         const fillAttr = child.getAttribute('fill') || child.getAttribute('data-fill-color');
-        const hasFill = fillAttr && fillAttr !== 'none' && fillAttr !== 'transparent';
+        const hasFill = (fillAttr && fillAttr !== 'none' && fillAttr !== 'transparent') || isText; // text almost always has a fill
 
         const virtualLayers = [];
 
-        // Order for UI rendering (will be reversed in Layer.jsx): Drop Shadow, Fill Color, Image/Video/GIF, Inner Shadow, Stroke
+        // Order for UI rendering (will be reversed in Layer.jsx): Drop Shadow, Fill Color, Image/Video/GIF/Text, Inner Shadow, Stroke
         if (activeEffects.includes('Drop Shadow')) {
           virtualLayers.push({ id: `${layer.id}-effect-drop-shadow`, name: 'Drop Shadow', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
         }
@@ -93,9 +102,12 @@ const parseLayersFromSVG = (element) => {
         } else if (child.getAttribute('data-is-gif-group') === 'true') {
           coreType = 'image';
           coreName = 'GIF';
+        } else if (isText) {
+          coreType = 'text';
+          coreName = 'Text';
         }
 
-        const imgChildIdx = layer.children ? layer.children.findIndex(c => c.type === coreType || c.name === coreName || c.name === 'Image') : -1;
+        const imgChildIdx = layer.children ? layer.children.findIndex(c => c.type === coreType || c.name === coreName || c.name === 'Image' || c.name === 'Text') : -1;
         let imgLayer = null;
         if (imgChildIdx !== -1) {
           imgLayer = layer.children.splice(imgChildIdx, 1)[0];
@@ -371,7 +383,7 @@ const TemplateEditor = () => {
         let newHtml = p.html;
         try {
           const parser = new DOMParser();
-          const doc = parser.parseFromString(newHtml, 'text/html');
+          const doc = parser.parseFromString(newHtml, 'image/svg+xml');
           const threedElements = doc.querySelectorAll('[data-interaction="3d-viewer"]');
 
           for (let el of threedElements) {
@@ -392,8 +404,26 @@ const TemplateEditor = () => {
             }
 
             if (actualDataUri) {
-              const res = await fetch(actualDataUri);
-              const blob = await res.blob();
+              let blob;
+              if (actualDataUri.startsWith('blob:')) {
+                const res = await fetch(actualDataUri);
+                blob = await res.blob();
+              } else {
+                const parts = actualDataUri.split(',');
+                const mimeString = parts[0].split(':')[1].split(';')[0];
+                let byteString;
+                if (parts[0].indexOf('base64') >= 0) {
+                    byteString = atob(parts[1]);
+                } else {
+                    byteString = decodeURI(parts[1]);
+                }
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                blob = new Blob([ab], { type: mimeString });
+              }
 
               const formData = new FormData();
               formData.append('emailId', user?.emailId);
@@ -463,34 +493,77 @@ const TemplateEditor = () => {
               }
             }
           }
-          const assetElements = doc.querySelectorAll('[data-interaction="download"], [data-interaction="audio"]');
-          for (let el of assetElements) {
-            let dataVal = el.getAttribute('data-interaction-value');
-            if (!dataVal) continue;
+          // --- DIRECT STRING SEARCH base64 extraction and upload ---
+          // Regex engines often fail silently or hit length limits on 3MB+ contiguous strings.
+          // We use a pure indexOf search to safely extract huge data URIs.
+          const uniqueDataUris = new Set();
+          let searchIndex = 0;
+          while (searchIndex < newHtml.length) {
+            const imgIdx = newHtml.indexOf('data:image/', searchIndex);
+            const audIdx = newHtml.indexOf('data:audio/', searchIndex);
+            
+            let foundIdx = -1;
+            if (imgIdx !== -1 && audIdx !== -1) foundIdx = Math.min(imgIdx, audIdx);
+            else if (imgIdx !== -1) foundIdx = imgIdx;
+            else if (audIdx !== -1) foundIdx = audIdx;
+            
+            if (foundIdx === -1) break;
 
-            let actualDataUri = null;
-            let originalJson = null;
-
-            if (dataVal.startsWith('{')) {
-              try {
-                originalJson = JSON.parse(dataVal);
-                if (originalJson.data && (originalJson.data.startsWith('data:') || originalJson.data.startsWith('blob:'))) {
-                  actualDataUri = originalJson.data;
-                }
-              } catch (e) { }
+            // The data URI is embedded in a JSON string, so it ends at &quot; or "
+            const endIdx1 = newHtml.indexOf('&quot;', foundIdx);
+            const endIdx2 = newHtml.indexOf('"', foundIdx);
+            
+            let endIdx = -1;
+            if (endIdx1 !== -1 && endIdx2 !== -1) endIdx = Math.min(endIdx1, endIdx2);
+            else if (endIdx1 !== -1) endIdx = endIdx1;
+            else if (endIdx2 !== -1) endIdx = endIdx2;
+            
+            if (endIdx !== -1) {
+              const dataUri = newHtml.substring(foundIdx, endIdx);
+              if (dataUri.includes(';base64,')) {
+                uniqueDataUris.add(dataUri);
+              }
+              searchIndex = endIdx;
+            } else {
+              break;
             }
+          }
 
-            if (actualDataUri && originalJson) {
-              const res = await fetch(actualDataUri);
-              const blob = await res.blob();
+          for (const actualDataUri of uniqueDataUris) {
+            try {
+              // Browsers (like Chrome) limit fetch() URLs to ~2MB.
+              // To handle 3MB+ data URIs, we manually convert base64 to Blob.
+              const parts = actualDataUri.split(',');
+              const mimeString = parts[0].split(':')[1].split(';')[0];
+              
+              // Handle URL encoded data URIs (e.g. svg+xml) or pure base64
+              let byteString;
+              if (parts[0].indexOf('base64') >= 0) {
+                  byteString = atob(parts[1]);
+              } else {
+                  byteString = decodeURI(parts[1]);
+              }
+              
+              const ab = new ArrayBuffer(byteString.length);
+              const ia = new Uint8Array(ab);
+              for (let i = 0; i < byteString.length; i++) {
+                  ia[i] = byteString.charCodeAt(i);
+              }
+              const blob = new Blob([ab], { type: mimeString });
+
+              const isAudio = blob.type.startsWith('audio/');
+              const assetType = isAudio ? 'audio' : 'image';
 
               const formData = new FormData();
               formData.append('emailId', user?.emailId);
               formData.append('folderName', fNameFor3D);
               formData.append('flipbookName', bNameFor3D);
-              formData.append('type', el.getAttribute('data-interaction') === 'download' ? 'image' : 'audio');
+              formData.append('type', assetType);
               formData.append('page_v_id', 'global');
-              formData.append('file', blob, originalJson.name || `asset_${Date.now()}`);
+              if (currentVId || v_id) {
+                formData.append('v_id', currentVId || v_id);
+              }
+              formData.append('file', blob, `asset_${Date.now()}`);
 
               const uploadRes = await axios.post(`${backendUrl}/api/flipbook/upload-asset`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -498,35 +571,33 @@ const TemplateEditor = () => {
 
               if (uploadRes.data && uploadRes.data.url) {
                 const finalUrl = uploadRes.data.url;
+                const assetPathMatch = finalUrl.match(/assets\/[^/]+\/[^/]+$/);
                 const sanitizedEmail = user?.emailId?.replace(/[@.]/g, "_");
-                const absoluteUrl = `${backendUrl}/uploads/${sanitizedEmail}/My_Flipbooks/${fNameFor3D}/${bNameFor3D}/${finalUrl.replace(/^\.\//, '')}`;
-                originalJson.data = absoluteUrl;
-                const newHtmlVal = JSON.stringify(originalJson);
+                const absoluteUrl = assetPathMatch
+                  ? `${backendUrl}/uploads/${sanitizedEmail}/My_Flipbooks/${fNameFor3D}/${bNameFor3D}/${assetPathMatch[0]}`
+                  : finalUrl;
 
-                const escapedOld = dataVal.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                const escapedNew = newHtmlVal.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                // Replace the data URI directly in the raw HTML
+                newHtml = newHtml.split(actualDataUri).join(absoluteUrl);
 
-                if (newHtml.includes(escapedOld)) {
-                  newHtml = newHtml.replace(escapedOld, escapedNew);
-                } else if (newHtml.includes(dataVal)) {
-                  newHtml = newHtml.replace(dataVal, newHtmlVal);
-                } else {
-                  newHtml = newHtml.replace(actualDataUri, absoluteUrl);
-                }
-
+                // Update the live DOM element so InteractionPanel shows the image immediately
                 try {
                   const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
                   if (editorDoc) {
-                    const liveEls = editorDoc.querySelectorAll(`[data-interaction="${el.getAttribute('data-interaction')}"]`);
+                    const liveEls = editorDoc.querySelectorAll(`[data-interaction="download"], [data-interaction="audio"]`);
                     liveEls.forEach(lEl => {
                       const lDataVal = lEl.getAttribute('data-interaction-value');
-                      if (lDataVal && lDataVal === dataVal) {
-                        lEl.setAttribute('data-interaction-value', newHtmlVal);
+                      if (lDataVal && lDataVal.includes(actualDataUri)) {
+                        lEl.setAttribute('data-interaction-value', lDataVal.split(actualDataUri).join(absoluteUrl));
                       }
                     });
                   }
                 } catch (e) { }
+
+                console.log(`[Save] Uploaded large asset directly: ${absoluteUrl}`);
               }
+            } catch (err) {
+              console.error('[Save] Failed to upload large asset directly:', err);
             }
           }
         } catch (err) {
@@ -579,7 +650,8 @@ const TemplateEditor = () => {
             let content = isModified ? p.html : undefined;
             let contentChunkId = undefined;
 
-            const fName = Array.isArray(currentBook?.folderName) ? currentBook.folderName[0] : (currentBook?.folderName || location.state?.folderName || 'Recent Book');
+            const folderNameArr = Array.isArray(currentBook?.folderName) ? currentBook.folderName : [currentBook?.folderName || location.state?.folderName || 'Recent Book'];
+            const fName = folderNameArr.find(f => f !== 'Recent Book' && f !== 'All Books') || folderNameArr[0] || 'Recent Book';
             const bName = currentBook?.flipbookName || location.state?.flipbookName || 'Untitled Flipbook';
             const projectBaseUrl = `${backendUrl}/uploads/${sanitizedEmail}/My_Flipbooks/${fName}/${bName}/`;
 
@@ -3315,9 +3387,10 @@ const TemplateEditor = () => {
           if (res.data && res.data.pages) {
             const parser = new DOMParser();
             const sanitizedEmail = user?.emailId?.replace(/[@.]/g, "_");
-            const folderName = res.data.meta.folderName;
-            const bookName = res.data.meta.flipbookName;
-            const projectBaseUrl = `${backendUrl}/uploads/${sanitizedEmail}/My_Flipbooks/${folderName}/${bookName}/`;
+            const folderNameArr = Array.isArray(res.data.meta.folderName) ? res.data.meta.folderName : [res.data.meta.folderName || 'Recent Book'];
+            const actualFolderName = folderNameArr.find(f => f !== 'Recent Book' && f !== 'All Books') || folderNameArr[0] || 'Recent Book';
+            const bookName = res.data.meta.flipbookName || 'Untitled Flipbook';
+            const projectBaseUrl = `${backendUrl}/uploads/${sanitizedEmail}/My_Flipbooks/${actualFolderName}/${bookName}/`;
 
             const mappedPages = await Promise.all(res.data.pages.map(async (p, i) => {
               const name = p.name || `Page ${i + 1}`;

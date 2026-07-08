@@ -817,7 +817,7 @@ const MainEditor = ({
         }
 
         const containerRect = pageContainer.getBoundingClientRect();
-        
+
         let elRect;
         try {
           const bbox = getVisualBBox(el);
@@ -1452,12 +1452,12 @@ const MainEditor = ({
 
           const VOL_ON_SVG = `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
           const VOL_OFF_SVG = `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
-          
+
           const updateVolumeIcon = () => {
             volumeBtn.innerHTML = (video.muted || video.volume === 0) ? VOL_OFF_SVG : VOL_ON_SVG;
           };
           updateVolumeIcon();
-          
+
           volumeBtn.onclick = (e) => {
             e.stopPropagation();
             video.muted = !video.muted;
@@ -1503,11 +1503,11 @@ const MainEditor = ({
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'auto'
           });
-          
+
           const onPlay = () => { playBtn.innerHTML = PAUSE_SVG; };
           const onPause = () => { playBtn.innerHTML = PLAY_SVG; };
           playBtn.innerHTML = video.paused ? PLAY_SVG : PAUSE_SVG;
-          
+
           video.addEventListener('play', onPlay);
           video.addEventListener('pause', onPause);
           video.addEventListener('volumechange', updateVolumeIcon);
@@ -1549,7 +1549,7 @@ const MainEditor = ({
             opacity: '0.9',
             marginBottom: '1em',
           });
-          
+
           const formatTime = (sec) => {
             if (isNaN(sec)) return "00:00";
             const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -1604,7 +1604,7 @@ const MainEditor = ({
             const rect = progContainer.getBoundingClientRect();
             const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             if (video.duration) video.currentTime = pct * video.duration;
-            
+
             const onMove = (me) => {
               const p = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
               if (video.duration) video.currentTime = p * video.duration;
@@ -1615,7 +1615,7 @@ const MainEditor = ({
             };
             document.addEventListener('pointermove', onMove);
             document.addEventListener('pointerup', onUp);
-            
+
             if (setSelectedLayerId) setSelectedLayerId(layerId);
           };
 
@@ -1625,7 +1625,7 @@ const MainEditor = ({
           bar.appendChild(topContainer);
           bar.appendChild(centerContainer);
           bar.appendChild(bottomContainer);
-          
+
           mountPoint.appendChild(bar);
 
           bar._cleanup = () => {
@@ -1762,9 +1762,9 @@ const MainEditor = ({
 
       // 2. Append to root frame or page container and center it
       const topFrames = getTopLevelFrames(svg);
-      let rootFrame = topFrames.find(f => 
-        !f.getAttribute('data-is-image-group') && 
-        !f.getAttribute('data-is-gif-group') && 
+      let rootFrame = topFrames.find(f =>
+        !f.getAttribute('data-is-image-group') &&
+        !f.getAttribute('data-is-gif-group') &&
         !f.getAttribute('data-is-video-group') &&
         f.getAttribute('data-name') !== 'Overlay'
       ) || svg;
@@ -2045,119 +2045,119 @@ const MainEditor = ({
           const handleSize = useLBrackets ? 12 : 9; // Slightly larger for interaction mode corners
           const handleNames = useLBrackets ? ['nw', 'ne', 'se', 'sw'] : ['nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w'];
 
-        // Define all points in world space
-        const worldPts = [...mapped]; // Corners
-        const midN = { x: (mapped[0].x + mapped[1].x) / 2, y: (mapped[0].y + mapped[1].y) / 2 };
-        const midE = { x: (mapped[1].x + mapped[2].x) / 2, y: (mapped[1].y + mapped[2].y) / 2 };
-        const midS = { x: (mapped[2].x + mapped[3].x) / 2, y: (mapped[2].y + mapped[3].y) / 2 };
-        const midW = { x: (mapped[3].x + mapped[0].x) / 2, y: (mapped[3].y + mapped[0].y) / 2 };
+          // Define all points in world space
+          const worldPts = [...mapped]; // Corners
+          const midN = { x: (mapped[0].x + mapped[1].x) / 2, y: (mapped[0].y + mapped[1].y) / 2 };
+          const midE = { x: (mapped[1].x + mapped[2].x) / 2, y: (mapped[1].y + mapped[2].y) / 2 };
+          const midS = { x: (mapped[2].x + mapped[3].x) / 2, y: (mapped[2].y + mapped[3].y) / 2 };
+          const midW = { x: (mapped[3].x + mapped[0].x) / 2, y: (mapped[3].y + mapped[0].y) / 2 };
 
-        const allPts = useLBrackets ? [...worldPts] : [...worldPts, midN, midE, midS, midW];
+          const allPts = useLBrackets ? [...worldPts] : [...worldPts, midN, midE, midS, midW];
 
-        // Detect current rotation for cursor mapping
-        const matrix = getElementMatrix(el);
-        const rotation = Math.round(Math.atan2(matrix.b, matrix.a) * (180 / Math.PI));
+          // Detect current rotation for cursor mapping
+          const matrix = getElementMatrix(el);
+          const rotation = Math.round(Math.atan2(matrix.b, matrix.a) * (180 / Math.PI));
 
-        allPts.forEach((p, i) => {
-          const name = handleNames[i];
-          const isSide = ['n', 'e', 's', 'w'].includes(name);
-          const handleId = `resize-handle-${el.id}-${name}`;
-          let handle = htmlOverlay?.querySelector(`[id="${handleId}"]`);
+          allPts.forEach((p, i) => {
+            const name = handleNames[i];
+            const isSide = ['n', 'e', 's', 'w'].includes(name);
+            const handleId = `resize-handle-${el.id}-${name}`;
+            let handle = htmlOverlay?.querySelector(`[id="${handleId}"]`);
 
-          if (!handle && htmlOverlay) {
-            handle = document.createElement('div');
-            handle.id = handleId;
-            handle.className = `resize-handle overlay-type-${type} absolute`;
+            if (!handle && htmlOverlay) {
+              handle = document.createElement('div');
+              handle.id = handleId;
+              handle.className = `resize-handle overlay-type-${type} absolute`;
 
-            if (useLBrackets) {
-              // Special L-corner for Interaction Mode and Free Frame
-              handle.style.backgroundColor = 'transparent';
-              handle.style.border = 'none';
-              handle.style.boxShadow = 'none';
-              if ((activeTopTool === 'interaction' || activeTopTool === 'animation') && el.getAttribute('data-name') !== 'Free Frame') {
-                handle.style.pointerEvents = 'none';
-              }
-
-              // Create the L-shape using inner divs
-              const hBar = document.createElement('div');
-              const vBar = document.createElement('div');
-              [hBar, vBar].forEach(bar => {
-                bar.style.position = 'absolute';
-                bar.style.backgroundColor = '#000000';
-                bar.style.border = 'none';
-                bar.style.boxSizing = 'border-box';
-                bar.style.pointerEvents = 'none';
-              });
-
-              const barThickness = 3;
-              hBar.style.width = '100%';
-              hBar.style.height = `${barThickness}px`;
-              vBar.style.width = `${barThickness}px`;
-              vBar.style.height = '100%';
-
-              // Align bars based on corner
-              if (name === 'nw') { hBar.style.top = '0'; hBar.style.left = '0'; vBar.style.top = '0'; vBar.style.left = '0'; }
-              if (name === 'ne') { hBar.style.top = '0'; hBar.style.right = '0'; vBar.style.top = '0'; vBar.style.right = '0'; }
-              if (name === 'se') { hBar.style.bottom = '0'; hBar.style.right = '0'; vBar.style.bottom = '0'; vBar.style.right = '0'; }
-              if (name === 'sw') { hBar.style.bottom = '0'; hBar.style.left = '0'; vBar.style.bottom = '0'; vBar.style.left = '0'; }
-
-              handle.appendChild(hBar);
-              handle.appendChild(vBar);
-            } else if (isSide) {
-              // Edge-handle: Invisible, but large hit area
-              handle.style.backgroundColor = 'rgba(255, 255, 255, 0.01)';
-            } else {
-              // Corner-handle: Professional white square
-              handle.style.backgroundColor = '#FFFFFF';
-              handle.style.border = '1.5px solid #6366F1';
-              handle.style.boxShadow = '0 1.5px 4px rgba(0,0,0,0.2)';
-              handle.style.borderRadius = '2px';
-            }
-
-            handle.style.boxSizing = 'border-box';
-            handle.style.pointerEvents = 'auto';
-            handle.style.zIndex = isSide ? '999' : '1000';
-            htmlOverlay.appendChild(handle);
-          }
-
-          if (handle) {
-            if (isSide && !useLBrackets) {
-              const zoomScale = zoom / 100;
-              const isHorizontal = (name === 'n' || name === 's');
-              const rawLength = (isHorizontal ? bbox.width : bbox.height) * scale;
-              const length = Math.max(rawLength, 20);
-              const thickness = 16 / zoomScale;
-
-              handle.style.width = isHorizontal ? `${length}px` : `${thickness}px`;
-              handle.style.height = isHorizontal ? `${thickness}px` : `${length}px`;
-              handle.style.left = `${p.x}px`;
-              handle.style.top = `${p.y}px`;
-              handle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-            } else {
-              const zoomScale = zoom / 100;
-              // Standard corner handle positioning
-              handle.style.width = `${handleSize}px`;
-              handle.style.height = `${handleSize}px`;
-
-              // Move handles slightly inward
-              let posX = p.x;
-              let posY = p.y;
               if (useLBrackets) {
-                // Offset of 4.5 aligns the center of the 3px bar exactly with the dotted line (handleSize 12/2 - barThickness 3/2 = 4.5)
-                const inwardOffset = 4.5 / zoomScale;
-                if (name === 'nw') { posX += inwardOffset; posY += inwardOffset; }
-                if (name === 'ne') { posX -= inwardOffset; posY += inwardOffset; }
-                if (name === 'se') { posX -= inwardOffset; posY -= inwardOffset; }
-                if (name === 'sw') { posX += inwardOffset; posY -= inwardOffset; }
+                // Special L-corner for Interaction Mode and Free Frame
+                handle.style.backgroundColor = 'transparent';
+                handle.style.border = 'none';
+                handle.style.boxShadow = 'none';
+                if ((activeTopTool === 'interaction' || activeTopTool === 'animation') && el.getAttribute('data-name') !== 'Free Frame') {
+                  handle.style.pointerEvents = 'none';
+                }
+
+                // Create the L-shape using inner divs
+                const hBar = document.createElement('div');
+                const vBar = document.createElement('div');
+                [hBar, vBar].forEach(bar => {
+                  bar.style.position = 'absolute';
+                  bar.style.backgroundColor = '#000000';
+                  bar.style.border = 'none';
+                  bar.style.boxSizing = 'border-box';
+                  bar.style.pointerEvents = 'none';
+                });
+
+                const barThickness = 3;
+                hBar.style.width = '100%';
+                hBar.style.height = `${barThickness}px`;
+                vBar.style.width = `${barThickness}px`;
+                vBar.style.height = '100%';
+
+                // Align bars based on corner
+                if (name === 'nw') { hBar.style.top = '0'; hBar.style.left = '0'; vBar.style.top = '0'; vBar.style.left = '0'; }
+                if (name === 'ne') { hBar.style.top = '0'; hBar.style.right = '0'; vBar.style.top = '0'; vBar.style.right = '0'; }
+                if (name === 'se') { hBar.style.bottom = '0'; hBar.style.right = '0'; vBar.style.bottom = '0'; vBar.style.right = '0'; }
+                if (name === 'sw') { hBar.style.bottom = '0'; hBar.style.left = '0'; vBar.style.bottom = '0'; vBar.style.left = '0'; }
+
+                handle.appendChild(hBar);
+                handle.appendChild(vBar);
+              } else if (isSide) {
+                // Edge-handle: Invisible, but large hit area
+                handle.style.backgroundColor = 'rgba(255, 255, 255, 0.01)';
+              } else {
+                // Corner-handle: Professional white square
+                handle.style.backgroundColor = '#FFFFFF';
+                handle.style.border = '1.5px solid #6366F1';
+                handle.style.boxShadow = '0 1.5px 4px rgba(0,0,0,0.2)';
+                handle.style.borderRadius = '2px';
               }
 
-              handle.style.left = `${posX}px`;
-              handle.style.top = `${posY}px`;
-              handle.style.transform = `translate(-50%, -50%) scale(${1 / zoomScale})`;
+              handle.style.boxSizing = 'border-box';
+              handle.style.pointerEvents = 'auto';
+              handle.style.zIndex = isSide ? '999' : '1000';
+              htmlOverlay.appendChild(handle);
             }
-            handle.style.cursor = getRotatingCursor(name, rotation);
-          }
-        });
+
+            if (handle) {
+              if (isSide && !useLBrackets) {
+                const zoomScale = zoom / 100;
+                const isHorizontal = (name === 'n' || name === 's');
+                const rawLength = (isHorizontal ? bbox.width : bbox.height) * scale;
+                const length = Math.max(rawLength, 20);
+                const thickness = 16 / zoomScale;
+
+                handle.style.width = isHorizontal ? `${length}px` : `${thickness}px`;
+                handle.style.height = isHorizontal ? `${thickness}px` : `${length}px`;
+                handle.style.left = `${p.x}px`;
+                handle.style.top = `${p.y}px`;
+                handle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+              } else {
+                const zoomScale = zoom / 100;
+                // Standard corner handle positioning
+                handle.style.width = `${handleSize}px`;
+                handle.style.height = `${handleSize}px`;
+
+                // Move handles slightly inward
+                let posX = p.x;
+                let posY = p.y;
+                if (useLBrackets) {
+                  // Offset of 4.5 aligns the center of the 3px bar exactly with the dotted line (handleSize 12/2 - barThickness 3/2 = 4.5)
+                  const inwardOffset = 4.5 / zoomScale;
+                  if (name === 'nw') { posX += inwardOffset; posY += inwardOffset; }
+                  if (name === 'ne') { posX -= inwardOffset; posY += inwardOffset; }
+                  if (name === 'se') { posX -= inwardOffset; posY -= inwardOffset; }
+                  if (name === 'sw') { posX += inwardOffset; posY -= inwardOffset; }
+                }
+
+                handle.style.left = `${posX}px`;
+                handle.style.top = `${posY}px`;
+                handle.style.transform = `translate(-50%, -50%) scale(${1 / zoomScale})`;
+              }
+              handle.style.cursor = getRotatingCursor(name, rotation);
+            }
+          });
         } // Close if (!hideHandles)
 
         // ── INTERACTION BADGE (Floating above the top-middle) ──
@@ -2702,13 +2702,13 @@ const MainEditor = ({
         setSelectedPenTool('pencil');
       } else if (e.key.toLowerCase() === 'g' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        
+
         const activeContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
         const svg = activeContainer?.querySelector('svg');
         if (!svg) return;
 
-        const ids = multiSelectedIdsRef.current.size > 0 
-          ? Array.from(multiSelectedIdsRef.current) 
+        const ids = multiSelectedIdsRef.current.size > 0
+          ? Array.from(multiSelectedIdsRef.current)
           : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
 
         const isUngroup = e.shiftKey;
@@ -2730,7 +2730,7 @@ const MainEditor = ({
             });
 
             if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
-            
+
             if (setSelectedLayerId) setSelectedLayerId(group.id);
             if (setMultiSelectedIds) setMultiSelectedIds(new Set([group.id]));
           }
@@ -2744,8 +2744,8 @@ const MainEditor = ({
           ids.forEach(id => {
             let el = svg.querySelector(`[id="${id}"]`);
             if (el && el.tagName.toLowerCase() !== 'g') {
-               let parentG = el.closest('g');
-               if (parentG) el = parentG;
+              let parentG = el.closest('g');
+              if (parentG) el = parentG;
             }
             if (el && el.tagName.toLowerCase() === 'g') {
               const elName = el.getAttribute('data-name') || '';
@@ -2761,7 +2761,7 @@ const MainEditor = ({
           groupsToUngroup.forEach(el => {
             const parent = el.parentNode;
             const children = Array.from(el.childNodes);
-            
+
             const groupTransform = el.getAttribute('transform') || '';
             const inheritableAttrs = ['fill', 'stroke', 'stroke-width', 'opacity', 'font-family', 'font-size', 'font-weight', 'color', 'letter-spacing', 'stroke-linecap', 'stroke-linejoin'];
             const inheritedStyles = {};
@@ -2770,28 +2770,28 @@ const MainEditor = ({
             });
 
             children.forEach((child, idx) => {
-               if (child.nodeType === 1) { // ELEMENT_NODE
-                 if (!child.id) {
-                   child.id = `ungrouped-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
-                 }
+              if (child.nodeType === 1) { // ELEMENT_NODE
+                if (!child.id) {
+                  child.id = `ungrouped-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+                }
 
-                 if (groupTransform) {
-                   const childTransform = child.getAttribute('transform') || '';
-                   child.setAttribute('transform', `${groupTransform} ${childTransform}`.trim());
-                 }
+                if (groupTransform) {
+                  const childTransform = child.getAttribute('transform') || '';
+                  child.setAttribute('transform', `${groupTransform} ${childTransform}`.trim());
+                }
 
-                 // Apply inherited styles to child if it doesn't override them
-                 Object.entries(inheritedStyles).forEach(([attr, val]) => {
-                   if (!child.hasAttribute(attr)) {
-                     child.setAttribute(attr, val);
-                   }
-                 });
+                // Apply inherited styles to child if it doesn't override them
+                Object.entries(inheritedStyles).forEach(([attr, val]) => {
+                  if (!child.hasAttribute(attr)) {
+                    child.setAttribute(attr, val);
+                  }
+                });
 
-                 parent.insertBefore(child, el);
-                 if (child.id) newSelectedIds.add(child.id);
-               }
+                parent.insertBefore(child, el);
+                if (child.id) newSelectedIds.add(child.id);
+              }
             });
-            
+
             parent.removeChild(el);
             hasChanges = true;
           });
@@ -2807,8 +2807,8 @@ const MainEditor = ({
         // Core Logic: Delete selected element
         e.preventDefault();
 
-        const ids = multiSelectedIdsRef.current.size > 0 
-          ? Array.from(multiSelectedIdsRef.current) 
+        const ids = multiSelectedIdsRef.current.size > 0
+          ? Array.from(multiSelectedIdsRef.current)
           : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
 
         if (ids.length === 0) return;
@@ -2888,10 +2888,10 @@ const MainEditor = ({
     window.addEventListener('keydown', handleKeyDown);
 
     const handleTriggerGroup = () => {
-      handleKeyDown({ key: 'g', ctrlKey: true, preventDefault: () => {} });
+      handleKeyDown({ key: 'g', ctrlKey: true, preventDefault: () => { } });
     };
     const handleTriggerUngroup = () => {
-      handleKeyDown({ key: 'G', ctrlKey: true, shiftKey: true, preventDefault: () => {} });
+      handleKeyDown({ key: 'G', ctrlKey: true, shiftKey: true, preventDefault: () => { } });
     };
     window.addEventListener('trigger-group', handleTriggerGroup);
     window.addEventListener('trigger-ungroup', handleTriggerUngroup);
@@ -3638,7 +3638,7 @@ const MainEditor = ({
               if (isScrollable) {
                 const rect = target.getBoundingClientRect();
                 const isScrollbarClick = event.clientX > rect.left + target.clientLeft + target.clientWidth ||
-                                         event.clientY > rect.top + target.clientTop + target.clientHeight;
+                  event.clientY > rect.top + target.clientTop + target.clientHeight;
                 if (isScrollbarClick) {
                   event.interaction.stop();
                   return;
@@ -3884,7 +3884,7 @@ const MainEditor = ({
               for (const item of dragState.multiDragItems) {
                 const currentPointLocal = getLocalPoint(dragState.svgElement, item.element.parentNode, event.clientX, event.clientY);
                 if (!currentPointLocal || !item.startPointLocal) continue;
-                
+
                 const dx = currentPointLocal.x - item.startPointLocal.x;
                 const dy = currentPointLocal.y - item.startPointLocal.y;
 
@@ -3939,15 +3939,15 @@ const MainEditor = ({
               }
             };
 
-             const constrainElement = (el, onComplete) => {
+            const constrainElement = (el, onComplete) => {
               if (!el || typeof el.getBBox !== 'function') return false;
-              
+
               let ctm, rootCtm, parentCtm;
               try {
                 ctm = el.getScreenCTM();
                 rootCtm = dragState.svgElement.getScreenCTM();
                 parentCtm = el.parentNode.getScreenCTM();
-              } catch(e) {
+              } catch (e) {
                 return false;
               }
               if (!ctm || !rootCtm || !parentCtm) return false;
@@ -3977,7 +3977,7 @@ const MainEditor = ({
                 const rootToParent = parentCtm.inverse().multiply(rootCtm);
                 const p0 = new DOMPoint(0, 0).matrixTransform(rootToParent);
                 const p1 = new DOMPoint(dx_root, dy_root).matrixTransform(rootToParent);
-                
+
                 const dx = p1.x - p0.x;
                 const dy = p1.y - p0.y;
 
@@ -4233,7 +4233,7 @@ const MainEditor = ({
                   const div = el.firstElementChild;
                   const oldHeight = div.style.height;
                   const oldMinHeight = div.style.minHeight;
-                  
+
                   // Temporarily allow height to shrink to measure true text height
                   div.style.setProperty('height', 'auto', 'important');
                   div.style.setProperty('min-height', '0px', 'important');
@@ -4247,7 +4247,7 @@ const MainEditor = ({
                       let minW = 10;
                       let maxW = 3000;
                       let bestW = finalWidth;
-                      
+
                       for (let i = 0; i < 12; i++) {
                         let midW = (minW + maxW) / 2;
                         el.setAttribute('width', midW);
@@ -4269,10 +4269,10 @@ const MainEditor = ({
                     // Scrollable text boxes CAN hide content. We respect the user's manual sizing exactly.
                     // No auto-height adjustments here.
                   }
-                  
+
                   div.style.setProperty('height', oldHeight || '100%', 'important');
                   div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
-                  
+
                   // Adjust coordinates to respect the handle anchor
                   if (dir === 'w' || dir === 'nw' || dir === 'sw') {
                     adjustedX = (finalX + finalWidth) - adjustedWidth;
@@ -4282,12 +4282,12 @@ const MainEditor = ({
                     if (align === 'center') adjustedX = finalX - (widthDiff / 2);
                     else if (align === 'right' || align === 'end') adjustedX = finalX - widthDiff;
                   }
-                  
+
                   if (dir === 'n' || dir === 'nw' || dir === 'ne') {
                     adjustedY = (finalY + finalHeight) - adjustedHeight;
                   }
                 }
-                
+
                 el.setAttribute('x', adjustedX);
                 el.setAttribute('y', adjustedY);
                 el.setAttribute('width', adjustedWidth);
@@ -4497,7 +4497,7 @@ const MainEditor = ({
         div.style.background = 'transparent';
         div.style.userSelect = 'none';
         div.style.pointerEvents = 'none';
-        
+
         div.innerText = 'Text';
         fo.appendChild(div);
 
@@ -5375,8 +5375,8 @@ const MainEditor = ({
     div.style.width = isScrollable ? '100%' : 'calc(100% + 4px)'; // keep scrollbar inside if scrollable
     div.style.minHeight = '100%';
     if (isScrollable) {
-        div.style.overflowY = 'auto';
-        div.style.overflowX = 'hidden';
+      div.style.overflowY = 'auto';
+      div.style.overflowX = 'hidden';
     }
     div.style.color = el.getAttribute('fill') || '#000000';
     div.style.fontFamily = el.getAttribute('font-family') || 'Inter, sans-serif';
@@ -5402,10 +5402,10 @@ const MainEditor = ({
     div.style.pointerEvents = 'none';
 
     if (!isScrollable) {
-        // Vertically center the text to match SVG bbox placement and prevent upward shift
-        div.style.display = 'flex';
-        div.style.flexDirection = 'column';
-        div.style.justifyContent = 'center';
+      // Vertically center the text to match SVG bbox placement and prevent upward shift
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.style.justifyContent = 'center';
     }
 
     // Smart tspan-to-lines conversion: group tspans by Y coordinate change
@@ -5415,7 +5415,7 @@ const MainEditor = ({
       let currentLineTspans = [];
       let lastY = null;
       let lineHeights = [];
-      
+
       const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
       const fontSize = parseFloat(fontSizeStr) || 10;
 
@@ -5423,23 +5423,23 @@ const MainEditor = ({
         const y = t.getAttribute('y');
         const dy = t.getAttribute('dy');
         const isNewLine = i > 0 && (dy || (y !== null && lastY !== null && Math.abs(parseFloat(y) - parseFloat(lastY)) > 2));
-        
+
         if (isNewLine) {
-           let deltaY = null;
-           if (dy) {
-              if (dy.endsWith('em')) deltaY = parseFloat(dy) * fontSize;
-              else deltaY = parseFloat(dy);
-           } else if (y !== null && lastY !== null) {
-              deltaY = Math.abs(parseFloat(y) - parseFloat(lastY));
-           }
-           if (deltaY !== null && !isNaN(deltaY) && deltaY > 0) {
-              // Ignore massive jumps (e.g. paragraph gaps) so they don't inflate the average line-height
-              if (deltaY < fontSize * 3) {
-                 lineHeights.push(deltaY);
-              }
-           }
+          let deltaY = null;
+          if (dy) {
+            if (dy.endsWith('em')) deltaY = parseFloat(dy) * fontSize;
+            else deltaY = parseFloat(dy);
+          } else if (y !== null && lastY !== null) {
+            deltaY = Math.abs(parseFloat(y) - parseFloat(lastY));
+          }
+          if (deltaY !== null && !isNaN(deltaY) && deltaY > 0) {
+            // Ignore massive jumps (e.g. paragraph gaps) so they don't inflate the average line-height
+            if (deltaY < fontSize * 3) {
+              lineHeights.push(deltaY);
+            }
+          }
         }
-        
+
         if (isNewLine) {
           linesData.push(currentLineTspans);
           currentLineTspans = [];
@@ -5462,19 +5462,19 @@ const MainEditor = ({
         let maxX = -Infinity;
         let textContent = '';
         lineTspans.forEach(t => {
-           try {
-             const x = parseFloat(t.getAttribute('x'));
-             if (!isNaN(x)) {
-               const w = t.getComputedTextLength ? t.getComputedTextLength() : t.textContent.length * (fontSize * 0.5);
-               minX = Math.min(minX, x);
-               maxX = Math.max(maxX, x + w);
-             } else {
-               const b = t.getBBox();
-               minX = Math.min(minX, b.x);
-               maxX = Math.max(maxX, b.x + b.width);
-             }
-           } catch(e) {}
-           textContent += t.textContent;
+          try {
+            const x = parseFloat(t.getAttribute('x'));
+            if (!isNaN(x)) {
+              const w = t.getComputedTextLength ? t.getComputedTextLength() : t.textContent.length * (fontSize * 0.5);
+              minX = Math.min(minX, x);
+              maxX = Math.max(maxX, x + w);
+            } else {
+              const b = t.getBBox();
+              minX = Math.min(minX, b.x);
+              maxX = Math.max(maxX, b.x + b.width);
+            }
+          } catch (e) { }
+          textContent += t.textContent;
         });
         return { minX, maxX, textContent };
       });
@@ -5482,32 +5482,32 @@ const MainEditor = ({
       const validBounds = linesBounds.filter(l => l.minX !== Infinity && l.maxX !== -Infinity);
       const globalMinX = validBounds.length > 0 ? Math.min(...validBounds.map(l => l.minX)) : 0;
       const globalMaxX = validBounds.length > 0 ? Math.max(...validBounds.map(l => l.maxX)) : 0;
-      
+
       let detectedAlign = 'left';
       if (validBounds.length > 1) {
-         let leftMatchCount = 0;
-         let rightMatchCount = 0;
-         let centerMatchCount = 0;
-         const tolerance = fontSize * 0.8;
-         
-         validBounds.forEach(l => {
-            if (Math.abs(l.minX - globalMinX) < tolerance) leftMatchCount++;
-            if (Math.abs(globalMaxX - l.maxX) < tolerance) rightMatchCount++;
-            const mid = (l.minX + l.maxX) / 2;
-            const gMid = (globalMinX + globalMaxX) / 2;
-            if (Math.abs(mid - gMid) < tolerance) centerMatchCount++;
-         });
-         
-         const thresh = Math.max(1, validBounds.length - 1);
-         if (leftMatchCount >= thresh && rightMatchCount >= thresh && validBounds.length > 1) {
-            detectedAlign = 'justify';
-         } else if (centerMatchCount >= thresh) {
-            detectedAlign = 'center';
-         } else if (rightMatchCount >= thresh) {
-            detectedAlign = 'right';
-         } else {
-            detectedAlign = 'left';
-         }
+        let leftMatchCount = 0;
+        let rightMatchCount = 0;
+        let centerMatchCount = 0;
+        const tolerance = fontSize * 0.8;
+
+        validBounds.forEach(l => {
+          if (Math.abs(l.minX - globalMinX) < tolerance) leftMatchCount++;
+          if (Math.abs(globalMaxX - l.maxX) < tolerance) rightMatchCount++;
+          const mid = (l.minX + l.maxX) / 2;
+          const gMid = (globalMinX + globalMaxX) / 2;
+          if (Math.abs(mid - gMid) < tolerance) centerMatchCount++;
+        });
+
+        const thresh = Math.max(1, validBounds.length - 1);
+        if (leftMatchCount >= thresh && rightMatchCount >= thresh && validBounds.length > 1) {
+          detectedAlign = 'justify';
+        } else if (centerMatchCount >= thresh) {
+          detectedAlign = 'center';
+        } else if (rightMatchCount >= thresh) {
+          detectedAlign = 'right';
+        } else {
+          detectedAlign = 'left';
+        }
       }
 
       // Paragraph reconstruction
@@ -5544,18 +5544,18 @@ const MainEditor = ({
       else if (originalAlign === 'end') finalAlign = 'right';
       else if (['left', 'center', 'right', 'justify'].includes(originalAlign)) finalAlign = originalAlign;
       else if (validBounds.length > 0) finalAlign = detectedAlign;
-      
+
       div.style.textAlign = finalAlign;
 
       // Use the exact original bounding box to preserve accurate visual alignment.
       const currentWidth = parseFloat(fo.getAttribute('width'));
       const currentX = parseFloat(fo.getAttribute('x'));
       fo.setAttribute('width', currentWidth);
-      
+
       if (finalAlign === 'right') {
-         fo.setAttribute('x', currentX);
+        fo.setAttribute('x', currentX);
       } else if (finalAlign === 'center') {
-         fo.setAttribute('x', currentX);
+        fo.setAttribute('x', currentX);
       }
     } else {
       div.textContent = el.textContent || '';
@@ -5606,7 +5606,7 @@ const MainEditor = ({
         const fo = convertTextToForeignObject(el);
         if (fo) {
           el.replaceWith(fo);
-          
+
           // Auto-snap height to perfectly fit the HTML text
           requestAnimationFrame(() => {
             const div = fo.firstElementChild;
@@ -5617,11 +5617,11 @@ const MainEditor = ({
               if (ch > 0 && Math.abs(ch - currentH) > 2) {
                 fo.setAttribute('height', ch);
               }
-              
+
               // Force interact.js/overlays to redraw bounds
               const event = new Event('resize');
               window.dispatchEvent(event);
-              
+
               // Explicitly redraw the highlight now that the FO has painted
               drawOverlayHighlight(fo, 'selected');
             }
@@ -5655,13 +5655,13 @@ const MainEditor = ({
       if (!fo) return;
       textEl.replaceWith(fo);
       foTarget = fo;
-      
+
       // Explicitly redraw the highlight now that the FO is in the DOM
       requestAnimationFrame(() => {
         const highlightType = document.querySelector(`[id="overlay-poly-child-selected-${foTarget.id}"]`) ? 'child-selected' : 'selected';
         drawOverlayHighlight(foTarget, highlightType);
       });
-      
+
       // Update selection to reflect new FO id (same as original text id)
       if (setSelectedLayerId) setSelectedLayerId(fo.id);
       selectedLayerIdRef.current = fo.id;
@@ -5711,9 +5711,9 @@ const MainEditor = ({
         // Temporarily allow height to shrink to measure true text height
         div.style.setProperty('height', 'auto', 'important');
         div.style.setProperty('min-height', '0px', 'important');
-        
+
         const contentH = div.scrollHeight;
-        
+
         div.style.setProperty('height', oldHeight || '100%', 'important');
         div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
 
@@ -5721,10 +5721,10 @@ const MainEditor = ({
 
         let changed = false;
         if (Math.abs(contentH - foH) > 2) {
-           foTarget.setAttribute('height', contentH + 4);
-           changed = true;
+          foTarget.setAttribute('height', contentH + 4);
+          changed = true;
         }
-        
+
         if (changed) {
           const highlightType = document.querySelector(`[id="overlay-poly-child-selected-${foTarget.id}"]`) ? 'child-selected' : 'selected';
           drawOverlayHighlight(foTarget, highlightType);
@@ -5748,7 +5748,7 @@ const MainEditor = ({
             sel.addRange(clickRange);
             placed = true;
           }
-        // Firefox
+          // Firefox
         } else if (document.caretPositionFromPoint) {
           const pos = document.caretPositionFromPoint(cx, cy);
           if (pos) {
@@ -5829,18 +5829,18 @@ const MainEditor = ({
         const oldWidth = div.style.width;
         const oldHeight = div.style.height;
         const oldMinHeight = div.style.minHeight;
-        
+
         if (isAutoWrap) {
-           div.style.width = 'max-content';
+          div.style.width = 'max-content';
         }
-        
+
         // Temporarily allow height to shrink to measure true text height
         div.style.setProperty('height', 'auto', 'important');
         div.style.setProperty('min-height', '0px', 'important');
-        
+
         const contentW = div.scrollWidth;
         const contentH = div.scrollHeight;
-        
+
         div.style.width = oldWidth;
         div.style.setProperty('height', oldHeight || '100%', 'important');
         div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
@@ -5850,18 +5850,18 @@ const MainEditor = ({
         const currentX = parseFloat(foTarget.getAttribute('x')) || 0;
 
         if (isAutoWrap && Math.abs(contentW - currentW) > 2) {
-           const widthDiff = contentW - currentW;
-           const align = window.getComputedStyle(div).textAlign;
-           foTarget.setAttribute('width', Math.max(contentW, 10));
-           if (align === 'center') {
-             foTarget.setAttribute('x', currentX - (widthDiff / 2));
-           } else if (align === 'right' || align === 'end') {
-             foTarget.setAttribute('x', currentX - widthDiff);
-           }
+          const widthDiff = contentW - currentW;
+          const align = window.getComputedStyle(div).textAlign;
+          foTarget.setAttribute('width', Math.max(contentW, 10));
+          if (align === 'center') {
+            foTarget.setAttribute('x', currentX - (widthDiff / 2));
+          } else if (align === 'right' || align === 'end') {
+            foTarget.setAttribute('x', currentX - widthDiff);
+          }
         }
-        
+
         if (Math.abs(contentH - currentH) > 2) {
-           foTarget.setAttribute('height', contentH + 4);
+          foTarget.setAttribute('height', contentH + 4);
         }
       }
 
@@ -5914,10 +5914,10 @@ const MainEditor = ({
     const dx = e.clientX - (lastClickRef.current.x || 0);
     const dy = e.clientY - (lastClickRef.current.y || 0);
     const distance = Math.hypot(dx, dy);
-    
+
     // A double click must happen within 500ms AND the mouse must not have moved more than 10 pixels
     const isDoubleClick = timeSinceLast > 0 && timeSinceLast < 500 && distance < 10;
-    
+
     lastClickRef.current = { time: now, target: e.target, x: e.clientX, y: e.clientY };
 
     if (isDoubleClick) {
@@ -6604,12 +6604,12 @@ const MainEditor = ({
         const p2 = new DOMPoint(rect.right, rect.bottom).matrixTransform(ctm);
         const p3 = new DOMPoint(rect.left, rect.bottom).matrixTransform(ctm);
         const p4 = new DOMPoint(rect.right, rect.top).matrixTransform(ctm);
-        
+
         const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
         const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
         const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
         const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
-        
+
         return {
           minX, maxX, minY, maxY,
           width: maxX - minX,
@@ -6630,7 +6630,7 @@ const MainEditor = ({
       const el = elements[0];
       const parent = el.parentNode;
       let parentBBox = null;
-      
+
       if (parent && parent.tagName && parent.tagName.toLowerCase() === 'g' && parent !== svg) {
         parentBBox = getElBBox(parent);
       }
@@ -6640,7 +6640,7 @@ const MainEditor = ({
       } else {
         const viewBox = svg.getAttribute('viewBox');
         const [vx, vy, vw, vh] = viewBox ? viewBox.split(' ').map(Number) : [0, 0, 595, 842];
-        targetBBox = { minX: vx, minY: vy, maxX: vx + vw, maxY: vy + vh, midX: vx + vw/2, midY: vy + vh/2 };
+        targetBBox = { minX: vx, minY: vy, maxX: vx + vw, maxY: vy + vh, midX: vx + vw / 2, midY: vy + vh / 2 };
       }
     } else {
       targetBBox = {
@@ -6652,7 +6652,7 @@ const MainEditor = ({
       targetBBox.midX = (targetBBox.minX + targetBBox.maxX) / 2;
       targetBBox.midY = (targetBBox.minY + targetBBox.maxY) / 2;
     }
-    
+
     const applyTranslation = (el, dx, dy) => {
       if (dx === 0 && dy === 0) return;
       try {
@@ -6661,12 +6661,12 @@ const MainEditor = ({
         const parentScreenCTM = el.parentNode.getScreenCTM();
         const parentToUserCTM = svgCTMInv.multiply(parentScreenCTM);
         const invParentCTM = parentToUserCTM.inverse();
-        
+
         const p0 = new DOMPoint(0, 0).matrixTransform(invParentCTM);
         const p1 = new DOMPoint(dx, dy).matrixTransform(invParentCTM);
         const localDx = p1.x - p0.x;
         const localDy = p1.y - p0.y;
-        
+
         const matrix = typeof getElementMatrix === 'function' ? getElementMatrix(el) : new DOMMatrix(el.getAttribute('transform') || '');
         const nextMatrix = new DOMMatrix().translate(localDx, localDy).multiply(matrix);
         if (typeof matrixToTransform === 'function') el.setAttribute('transform', matrixToTransform(nextMatrix));
@@ -6679,7 +6679,7 @@ const MainEditor = ({
       const last = elBBoxes[elBBoxes.length - 1];
       const totalDistance = last.bbox.midX - first.bbox.midX;
       const gap = totalDistance / (elBBoxes.length - 1);
-      
+
       let currentMidX = first.bbox.midX + gap;
       for (let i = 1; i < elBBoxes.length - 1; i++) {
         const item = elBBoxes[i];
@@ -6693,7 +6693,7 @@ const MainEditor = ({
       const last = elBBoxes[elBBoxes.length - 1];
       const totalDistance = last.bbox.midY - first.bbox.midY;
       const gap = totalDistance / (elBBoxes.length - 1);
-      
+
       let currentMidY = first.bbox.midY + gap;
       for (let i = 1; i < elBBoxes.length - 1; i++) {
         const item = elBBoxes[i];
