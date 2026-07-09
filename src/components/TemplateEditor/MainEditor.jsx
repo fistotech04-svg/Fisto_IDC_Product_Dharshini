@@ -16,10 +16,10 @@ const DIRECT_CURSOR = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.or
 
 export const getVisualBBox = (el) => {
   if (!el || typeof el.getBBox !== 'function') return { x: 0, y: 0, width: 0, height: 0 };
-  const bbox = el.getBBox();
-
+  
   const cropStr = el.getAttribute('data-crop-data');
   if (cropStr && cropStr !== 'null') {
+    const bbox = el.getBBox();
     try {
       const crop = JSON.parse(cropStr);
       return {
@@ -28,9 +28,53 @@ export const getVisualBBox = (el) => {
         width: bbox.width * (parseFloat(crop.width) / 100),
         height: bbox.height * (parseFloat(crop.height) / 100)
       };
-    } catch (e) { return bbox; }
+    } catch (e) {}
   }
-  return bbox;
+
+  if (el.tagName.toLowerCase() === 'g' && el.querySelector('[data-crop-data]')) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const children = Array.from(el.children);
+    let hasValidChild = false;
+    
+    for (const child of children) {
+      if (typeof child.getBBox === 'function' && child.style.display !== 'none' && child.style.visibility !== 'hidden' && child.tagName.toLowerCase() !== 'defs') {
+        const childBBox = getVisualBBox(child);
+        let childMatrix = new DOMMatrix();
+        try {
+          const parentCTM = el.getCTM();
+          const childCTM = child.getCTM();
+          if (parentCTM && childCTM) {
+            childMatrix = parentCTM.inverse().multiply(childCTM);
+          }
+        } catch (e) {}
+        
+        const pt1 = new DOMPoint(childBBox.x, childBBox.y).matrixTransform(childMatrix);
+        const pt2 = new DOMPoint(childBBox.x + childBBox.width, childBBox.y).matrixTransform(childMatrix);
+        const pt3 = new DOMPoint(childBBox.x + childBBox.width, childBBox.y + childBBox.height).matrixTransform(childMatrix);
+        const pt4 = new DOMPoint(childBBox.x, childBBox.y + childBBox.height).matrixTransform(childMatrix);
+        
+        const pts = [pt1, pt2, pt3, pt4];
+        for (const pt of pts) {
+          if (pt.x < minX) minX = pt.x;
+          if (pt.y < minY) minY = pt.y;
+          if (pt.x > maxX) maxX = pt.x;
+          if (pt.y > maxY) maxY = pt.y;
+        }
+        hasValidChild = true;
+      }
+    }
+    
+    if (hasValidChild) {
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      };
+    }
+  }
+
+  return el.getBBox();
 };
 
 // Global style to ensure injected SVGs always fill their container perfectly
@@ -3664,7 +3708,8 @@ const MainEditor = ({
             let target = event.target;
 
             const container = target.closest('.page-svg-container');
-            const rootSvg = container ? container.querySelector(':scope > svg') : null;
+            const canvasContent = container ? container.querySelector('[id^="canvas-content-"]') : null;
+            const rootSvg = canvasContent ? canvasContent.querySelector('svg') : null;
             const svgElement = rootSvg || target.ownerSVGElement || (target.tagName.toLowerCase() === 'svg' ? target : null);
             if (!svgElement) return;
 
@@ -3893,7 +3938,7 @@ const MainEditor = ({
             // ── RE-SYNC: If React re-rendered and the original nodes were detached, ──
             // find the new live nodes in the DOM by their IDs to keep the drag alive.
             if (dragState.svgElement && !dragState.svgElement.isConnected) {
-              const liveSvg = document.querySelector(`.page-svg-container[data-page-index="${dragState.pageIndex}"] svg`);
+              const liveSvg = document.querySelector(`.page-svg-container[data-page-index="${dragState.pageIndex}"] [id^="canvas-content-"] > svg`);
               if (liveSvg) dragState.svgElement = liveSvg;
             }
             if (dragState.element && !dragState.element.isConnected) {

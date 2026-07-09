@@ -753,12 +753,22 @@ const RightSidebar = ({
                             if (typeof newHtml === 'string') {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             } else {
-                              const pageContainer = document.querySelector(`[data-page-index="${activePageIndex}"]`);
-                              const svgRoot = pageContainer?.querySelector('svg') || (() => {
+                              const svgRoot = (() => {
                                 const el = document.getElementById(selectedLayerId);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) {
+                                  const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                  return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                                }
+                                
                                 let node = el;
-                                while (node && node.tagName?.toLowerCase() !== 'svg') node = node.parentElement;
-                                return node;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
                               })();
                               if (svgRoot) {
                                 const serializer = new XMLSerializer();
@@ -791,12 +801,19 @@ const RightSidebar = ({
                             if (typeof newHtml === 'string') {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             } else {
-                              const pageContainer = document.querySelector(`[data-page-index="${activePageIndex}"]`);
-                              const svgRoot = pageContainer?.querySelector('svg') || (() => {
+                              const svgRoot = (() => {
                                 const el = document.getElementById(selectedLayerId);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) return container.querySelector('svg');
+                                
                                 let node = el;
-                                while (node && node.tagName?.toLowerCase() !== 'svg') node = node.parentElement;
-                                return node;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
                               })();
                               if (svgRoot) {
                                 const serializer = new XMLSerializer();
@@ -823,12 +840,19 @@ const RightSidebar = ({
                             if (typeof newHtml === 'string') {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             } else {
-                              const pageContainer = document.querySelector(`[data-page-index="${activePageIndex}"]`);
-                              const svgRoot = pageContainer?.querySelector('svg') || (() => {
+                              const svgRoot = (() => {
                                 const el = document.getElementById(selectedLayerId);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) return container.querySelector('svg');
+                                
                                 let node = el;
-                                while (node && node.tagName?.toLowerCase() !== 'svg') node = node.parentElement;
-                                return node;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
                               })();
                               if (svgRoot) {
                                 const serializer = new XMLSerializer();
@@ -855,12 +879,19 @@ const RightSidebar = ({
                             if (typeof newHtml === 'string') {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             } else {
-                              const pageContainer = document.querySelector(`[data-page-index="${activePageIndex}"]`);
-                              const svgRoot = pageContainer?.querySelector('svg') || (() => {
+                              const svgRoot = (() => {
                                 const el = document.getElementById(selectedLayerId);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) return container.querySelector('svg');
+                                
                                 let node = el;
-                                while (node && node.tagName?.toLowerCase() !== 'svg') node = node.parentElement;
-                                return node;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
                               })();
                               if (svgRoot) {
                                 const serializer = new XMLSerializer();
