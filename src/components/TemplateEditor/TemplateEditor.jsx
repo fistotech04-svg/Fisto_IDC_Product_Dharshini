@@ -65,11 +65,12 @@ const parseLayersFromSVG = (element) => {
         child.getAttribute('data-is-video-group') === 'true' ||
         child.getAttribute('data-is-gif-group') === 'true';
 
-      const isText = child.tagName.toLowerCase() === 'text' || child.tagName.toLowerCase() === 'foreignobject';
+      const isText = child.tagName.toLowerCase() === 'text' ||
+        (child.tagName.toLowerCase() === 'foreignobject' && child.getAttribute('data-type') !== 'video' && child.getAttribute('data-type') !== 'iframe');
 
       if (isGroup || isText) {
         let activeEffects = [];
-        
+
         if (isGroup) {
           const activeEffectsStr = child.getAttribute('data-active-effects') || '';
           activeEffects = activeEffectsStr.split(',').filter(Boolean);
@@ -413,14 +414,14 @@ const TemplateEditor = () => {
                 const mimeString = parts[0].split(':')[1].split(';')[0];
                 let byteString;
                 if (parts[0].indexOf('base64') >= 0) {
-                    byteString = atob(parts[1]);
+                  byteString = atob(parts[1]);
                 } else {
-                    byteString = decodeURI(parts[1]);
+                  byteString = decodeURI(parts[1]);
                 }
                 const ab = new ArrayBuffer(byteString.length);
                 const ia = new Uint8Array(ab);
                 for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
+                  ia[i] = byteString.charCodeAt(i);
                 }
                 blob = new Blob([ab], { type: mimeString });
               }
@@ -501,23 +502,23 @@ const TemplateEditor = () => {
           while (searchIndex < newHtml.length) {
             const imgIdx = newHtml.indexOf('data:image/', searchIndex);
             const audIdx = newHtml.indexOf('data:audio/', searchIndex);
-            
+
             let foundIdx = -1;
             if (imgIdx !== -1 && audIdx !== -1) foundIdx = Math.min(imgIdx, audIdx);
             else if (imgIdx !== -1) foundIdx = imgIdx;
             else if (audIdx !== -1) foundIdx = audIdx;
-            
+
             if (foundIdx === -1) break;
 
             // The data URI is embedded in a JSON string, so it ends at &quot; or "
             const endIdx1 = newHtml.indexOf('&quot;', foundIdx);
             const endIdx2 = newHtml.indexOf('"', foundIdx);
-            
+
             let endIdx = -1;
             if (endIdx1 !== -1 && endIdx2 !== -1) endIdx = Math.min(endIdx1, endIdx2);
             else if (endIdx1 !== -1) endIdx = endIdx1;
             else if (endIdx2 !== -1) endIdx = endIdx2;
-            
+
             if (endIdx !== -1) {
               const dataUri = newHtml.substring(foundIdx, endIdx);
               if (dataUri.includes(';base64,')) {
@@ -535,19 +536,19 @@ const TemplateEditor = () => {
               // To handle 3MB+ data URIs, we manually convert base64 to Blob.
               const parts = actualDataUri.split(',');
               const mimeString = parts[0].split(':')[1].split(';')[0];
-              
+
               // Handle URL encoded data URIs (e.g. svg+xml) or pure base64
               let byteString;
               if (parts[0].indexOf('base64') >= 0) {
-                  byteString = atob(parts[1]);
+                byteString = atob(parts[1]);
               } else {
-                  byteString = decodeURI(parts[1]);
+                byteString = decodeURI(parts[1]);
               }
-              
+
               const ab = new ArrayBuffer(byteString.length);
               const ia = new Uint8Array(ab);
               for (let i = 0; i < byteString.length; i++) {
-                  ia[i] = byteString.charCodeAt(i);
+                ia[i] = byteString.charCodeAt(i);
               }
               const blob = new Blob([ab], { type: mimeString });
 
@@ -842,7 +843,7 @@ const TemplateEditor = () => {
       }
     }, 500); // Give save a moment to complete
   }, [currentBook]);
-  
+
   useEffect(() => {
     if (setPreviewHandler) {
       setPreviewHandler(() => stablePreviewHandler);
@@ -2255,7 +2256,7 @@ const TemplateEditor = () => {
 
     // 1. Layer Blur
     if (hasBlur) {
-      const blurVal = parseFloat(getVal('data-effect-blur-value', '4'));
+      const blurVal = parseFloat(getVal('data-effect-blur-value', '1'));
       const spreadVal = parseFloat(getVal('data-effect-blur-spread', '0'));
 
       let blurSource = currentIn;

@@ -138,7 +138,7 @@ const LayerItem = ({
 
   const handleItemClick = (e) => {
     e.stopPropagation();
-    
+
     const targetId = layer.isVirtualImageChild ? layer.parentId : layer.id;
 
     if (e.shiftKey) {
@@ -155,7 +155,7 @@ const LayerItem = ({
     }
   };
 
-const handleContextMenu = (e) => {
+  const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (onLayerContextMenu) {
@@ -443,10 +443,10 @@ const Layer = ({
   const activePageId = pages[activePageIndex]?.id;
   useEffect(() => {
     if (activePageId && isVisible) {
-      const elementId = activeTab === 'layers' 
-        ? `page-card-${activePageId}` 
+      const elementId = activeTab === 'layers'
+        ? `page-card-${activePageId}`
         : `page-card-preview-${activePageId}`;
-      
+
       const el = document.getElementById(elementId);
       if (el) {
         // Small timeout for layout stabilization
@@ -681,14 +681,14 @@ const Layer = ({
 
               const page = pages[activePageIndex];
               const clickedLayerName = page?.layers?.find(l => l.id === activeLayerMenu.layerId)?.name;
-              
+
               const realLayers = page?.layers ? page.layers.filter(l => l.name !== 'Free Frame') : [];
               const rootGroupLayer = (realLayers.length === 1 && (realLayers[0].name === page?.name || realLayers[0].name?.startsWith('Page '))) ? realLayers[0] : null;
-              
-              const isPageBackground = activeLayerMenu.isOverlay || 
-                                       (page && activeLayerMenu.layerId === page.id) || 
-                                       clickedLayerName === 'Free Frame' ||
-                                       (rootGroupLayer && activeLayerMenu.layerId === rootGroupLayer.id);
+
+              const isPageBackground = activeLayerMenu.isOverlay ||
+                (page && activeLayerMenu.layerId === page.id) ||
+                clickedLayerName === 'Free Frame' ||
+                (rootGroupLayer && activeLayerMenu.layerId === rootGroupLayer.id);
 
               const isRootLayer = isPageBackground ||
                 (page && page.layers && page.layers.some(l => l.id === activeLayerMenu.layerId));
@@ -700,7 +700,7 @@ const Layer = ({
                 } else {
                   pageLayerIds = realLayers.map(l => l.id);
                 }
-                
+
                 const cutCopyTargets = isPageBackground ? pageLayerIds : targetIds;
                 const disableCutCopy = isPageBackground && cutCopyTargets.length === 0;
 
@@ -765,7 +765,7 @@ const Layer = ({
                       </button>
                     </>
                   )}
-                  
+
                   <button
                     onClick={() => {
                       if (!canGroup) return;
@@ -773,9 +773,8 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canGroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
-                      !canGroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
-                    }`}
+                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${!canGroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                      }`}
                   >
                     <Icon icon="mdi-light:group" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
                     Group
@@ -787,9 +786,8 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canUngroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
-                      !canUngroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
-                    }`}
+                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${!canUngroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                      }`}
                   >
                     <Icon icon="mdi-light:ungroup" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
                     Ungroup

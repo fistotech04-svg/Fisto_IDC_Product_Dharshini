@@ -4404,6 +4404,7 @@ const MainEditor = ({
 
   const saveModifiedPageHtml = (targetPageIndex, targetSvg) => {
     if (!updatePageHtmlRef.current) return;
+    window.__skipCanvasUpdateForPage = targetPageIndex;
     let finalHtml = targetSvg.outerHTML;
     if (isDoublePage && pages && pages[targetPageIndex]) {
       const groupWrap = targetSvg.querySelector(`#page-group-${targetPageIndex}`);
@@ -7560,7 +7561,49 @@ const MainEditor = ({
                           <div
                             id={`canvas-content-${displayIndex}`}
                             className="w-full h-full flex items-center justify-center"
-                            dangerouslySetInnerHTML={{ __html: getHtmlToRender(displayIndex, pages[displayIndex]?.html) }}
+                            ref={(el) => {
+                                if (el) {
+                                  const newHtml = getHtmlToRender(displayIndex, pages[displayIndex]?.html);
+                                  if (window.__skipCanvasUpdateForPage === displayIndex) {
+                                      window.__skipCanvasUpdateForPage = -1;
+                                      el.__lastHtml = newHtml;
+                                  } else if (el.__lastHtml !== newHtml) {
+                                      const videos = Array.from(el.querySelectorAll('video'));
+                                      const videoStates = videos.map(v => ({
+                                          id: v.id || v.closest('[id]')?.id,
+                                          node: v
+                                      }));
+                                      
+                                      let safeBin = document.getElementById('video-safe-bin');
+                                      if (!safeBin) {
+                                        safeBin = document.createElement('div');
+                                        safeBin.id = 'video-safe-bin';
+                                        safeBin.style.display = 'none';
+                                        document.body.appendChild(safeBin);
+                                      }
+                                      videoStates.forEach(state => safeBin.appendChild(state.node));
+
+                                      el.innerHTML = newHtml;
+                                      
+                                      videoStates.forEach(state => {
+                                          if (!state.id) return;
+                                          const newContainer = el.querySelector(`[id="${state.id}"]`);
+                                          if (newContainer) {
+                                              const newVideo = newContainer.querySelector('video');
+                                              if (newVideo && newVideo.parentNode) {
+                                                  Array.from(newVideo.attributes).forEach(attr => {
+                                                      if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
+                                                          state.node.setAttribute(attr.name, attr.value);
+                                                      }
+                                                  });
+                                                  newVideo.parentNode.replaceChild(state.node, newVideo);
+                                              }
+                                          }
+                                      });
+                                      el.__lastHtml = newHtml;
+                                  }
+                                }
+                            }}
                             onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
                             onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
                             onMouseLeave={handleSvgMouseLeave}
@@ -7754,14 +7797,56 @@ const MainEditor = ({
                           className={`absolute inset-0 w-full h-full overflow-visible flex items-center justify-center ${isPopupEditor ? 'bg-transparent' : 'bg-white'}`}
                           style={{ cursor: ((activeMainTool === 'pen' && selectedPenTool === 'pencil') ? PENCIL_CURSOR : (isPenToolActive ? PEN_CURSOR : (isShapeActive ? SHAPE_CURSOR : (isTypeActive ? TYPE_CURSOR : 'default')))) }}
                         >
-                          <div
-                            id={`canvas-content-${displayIndex}`}
-                            className="w-full h-full flex items-center justify-center"
-                            dangerouslySetInnerHTML={{ __html: getHtmlToRender(displayIndex, page.html) }}
-                            onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
-                            onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
-                            onMouseLeave={handleSvgMouseLeave}
-                            onClick={handleSvgClick}
+                            <div
+                              id={`canvas-content-${displayIndex}`}
+                              className="w-full h-full flex items-center justify-center"
+                              ref={(el) => {
+                                if (el) {
+                                  const newHtml = getHtmlToRender(displayIndex, page.html);
+                                  if (window.__skipCanvasUpdateForPage === displayIndex) {
+                                      window.__skipCanvasUpdateForPage = -1;
+                                      el.__lastHtml = newHtml;
+                                  } else if (el.__lastHtml !== newHtml) {
+                                      const videos = Array.from(el.querySelectorAll('video'));
+                                      const videoStates = videos.map(v => ({
+                                          id: v.id || v.closest('[id]')?.id,
+                                          node: v
+                                      }));
+                                      
+                                      let safeBin = document.getElementById('video-safe-bin');
+                                      if (!safeBin) {
+                                        safeBin = document.createElement('div');
+                                        safeBin.id = 'video-safe-bin';
+                                        safeBin.style.display = 'none';
+                                        document.body.appendChild(safeBin);
+                                      }
+                                      videoStates.forEach(state => safeBin.appendChild(state.node));
+
+                                      el.innerHTML = newHtml;
+                                      
+                                      videoStates.forEach(state => {
+                                          if (!state.id) return;
+                                          const newContainer = el.querySelector(`[id="${state.id}"]`);
+                                          if (newContainer) {
+                                              const newVideo = newContainer.querySelector('video');
+                                              if (newVideo && newVideo.parentNode) {
+                                                  Array.from(newVideo.attributes).forEach(attr => {
+                                                      if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
+                                                          state.node.setAttribute(attr.name, attr.value);
+                                                      }
+                                                  });
+                                                  newVideo.parentNode.replaceChild(state.node, newVideo);
+                                              }
+                                          }
+                                      });
+                                      el.__lastHtml = newHtml;
+                                  }
+                                }
+                              }}
+                              onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
+                              onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
+                              onMouseLeave={handleSvgMouseLeave}
+                              onClick={handleSvgClick}
                             // onDoubleClick={handleSvgDoubleClick} // replaced by manual detection in handleSvgClick
                             onContextMenu={(e) => handleSvgContextMenu(displayIndex, e)}
                           />

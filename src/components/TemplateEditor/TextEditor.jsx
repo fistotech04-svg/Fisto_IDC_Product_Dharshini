@@ -260,15 +260,15 @@ const syncGradient = (doc, element, baseAttr) => {
       } else {
         cssGradStr = `radial-gradient(circle, ${stops.map(s => `${s.color} ${s.offset}%`).join(', ')})`;
       }
-      
+
       const applyCssGradToElement = (el) => {
-          el.style.setProperty('background-image', cssGradStr, 'important');
-          el.style.setProperty('-webkit-background-clip', 'text', 'important');
-          el.style.setProperty('background-clip', 'text', 'important');
-          el.style.setProperty('color', 'transparent', 'important');
-          el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+        el.style.setProperty('background-image', cssGradStr, 'important');
+        el.style.setProperty('-webkit-background-clip', 'text', 'important');
+        el.style.setProperty('background-clip', 'text', 'important');
+        el.style.setProperty('color', 'transparent', 'important');
+        el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
       };
-      
+
       applyCssGradToElement(element.firstElementChild);
       Array.from(element.firstElementChild.querySelectorAll('*')).forEach(applyCssGradToElement);
     }
@@ -307,7 +307,7 @@ const syncTextEffect = (doc, element) => {
       } else {
         let cssFilter = '';
         if (hasBlur) {
-          const blurVal = getVal('data-effect-blur-value', '4');
+          const blurVal = getVal('data-effect-blur-value', '1');
           cssFilter += `blur(${blurVal}px) `;
         }
         if (hasDropShadow) {
@@ -396,7 +396,7 @@ const syncTextEffect = (doc, element) => {
   let currentIn = "SourceGraphic";
 
   if (hasBlur) {
-    const blurVal = parseFloat(getVal('data-effect-blur-value', '4'));
+    const blurVal = parseFloat(getVal('data-effect-blur-value', '1'));
     const spreadVal = parseFloat(getVal('data-effect-blur-spread', '0'));
     let blurSource = currentIn;
     if (spreadVal !== 0) {
@@ -612,8 +612,8 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     return {
       'Drop Shadow': { color: p['data-effect-drop-shadow-color'] || '#000000', opacity: parseFloat(p['data-effect-drop-shadow-opacity'] || 35), x: parseFloat(p['data-effect-drop-shadow-x'] || 4), y: parseFloat(p['data-effect-drop-shadow-y'] || 4), blur: parseFloat(p['data-effect-drop-shadow-blur'] || 4), spread: 0 },
       'Inner Shadow': { color: p['data-effect-inner-shadow-color'] || '#FFFFFF', opacity: parseFloat(p['data-effect-inner-shadow-opacity'] || 100), x: parseFloat(p['data-effect-inner-shadow-x'] || 4), y: parseFloat(p['data-effect-inner-shadow-y'] || 4), blur: parseFloat(p['data-effect-inner-shadow-blur'] || 1), spread: 0 },
-      'Blur': { blur: parseFloat(p['data-effect-blur-value'] || 4), spread: 0 },
-      'Background Blur': { blur: parseFloat(p['data-effect-background-blur-value'] || 10), spread: 0 }
+      'Blur': { blur: parseFloat(p['data-effect-blur-value'] || 1), spread: 0 },
+      'Background Blur': { blur: parseFloat(p['data-effect-background-blur-value'] || 1), spread: 0 }
     };
   });
 
@@ -669,8 +669,8 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     setEffectSettings({
       'Drop Shadow': { color: selectedElementProps?.['data-effect-drop-shadow-color'] || '#000000', opacity: parseFloat(selectedElementProps?.['data-effect-drop-shadow-opacity'] || 35), x: parseFloat(selectedElementProps?.['data-effect-drop-shadow-x'] || 4), y: parseFloat(selectedElementProps?.['data-effect-drop-shadow-y'] || 4), blur: parseFloat(selectedElementProps?.['data-effect-drop-shadow-blur'] || 4), spread: 0 },
       'Inner Shadow': { color: selectedElementProps?.['data-effect-inner-shadow-color'] || '#FFFFFF', opacity: parseFloat(selectedElementProps?.['data-effect-inner-shadow-opacity'] || 100), x: parseFloat(selectedElementProps?.['data-effect-inner-shadow-x'] || 4), y: parseFloat(selectedElementProps?.['data-effect-inner-shadow-y'] || 4), blur: parseFloat(selectedElementProps?.['data-effect-inner-shadow-blur'] || 1), spread: 0 },
-      'Blur': { blur: parseFloat(selectedElementProps?.['data-effect-blur-value'] || 4), spread: 0 },
-      'Background Blur': { blur: parseFloat(selectedElementProps?.['data-effect-background-blur-value'] || 10), spread: 0 }
+      'Blur': { blur: parseFloat(selectedElementProps?.['data-effect-blur-value'] || 1), spread: 0 },
+      'Background Blur': { blur: parseFloat(selectedElementProps?.['data-effect-background-blur-value'] || 1), spread: 0 }
     });
   }, [selectedLayerId, activePageIndex]);
 
@@ -689,13 +689,13 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke', backgroundColor.stroke);
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeWidth', backgroundColor.strokeWeight.toString());
       if (backgroundColor.strokeType === 'gradient' || backgroundColor.strokeStops) {
-          updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'gradient');
-          if (backgroundColor.strokeGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-gradient-type', backgroundColor.strokeGradientType);
-          if (backgroundColor.strokeStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-stops', backgroundColor.strokeStops);
-          if (backgroundColor.strokeAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-angle', backgroundColor.strokeAngle.toString());
-          if (backgroundColor.strokeRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-radius', backgroundColor.strokeRadius.toString());
+        updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'gradient');
+        if (backgroundColor.strokeGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-gradient-type', backgroundColor.strokeGradientType);
+        if (backgroundColor.strokeStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-stops', backgroundColor.strokeStops);
+        if (backgroundColor.strokeAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-angle', backgroundColor.strokeAngle.toString());
+        if (backgroundColor.strokeRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-radius', backgroundColor.strokeRadius.toString());
       } else if (backgroundColor.stroke !== 'none' && !backgroundColor.stroke.includes('url(#')) {
-          updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'solid');
+        updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'solid');
       }
 
       const dashVal = backgroundColor.strokeDashStyle === 'Dashed' ? `${backgroundColor.strokeDashLength || 5},${backgroundColor.strokeDashGap || 5}` : 'none';
@@ -962,7 +962,7 @@ const TextEditor = ({
           if (liveEl.firstElementChild && styleProp) {
             let applyVal = finalVal;
             if (styleProp === 'fontFamily' && typeof applyVal === 'string' && !applyVal.includes("'") && !applyVal.includes('"')) {
-               applyVal = `'${applyVal}'`;
+              applyVal = `'${applyVal}'`;
             }
             if (styleProp === 'stroke') {
               liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', finalVal, 'important');
@@ -976,20 +976,20 @@ const TextEditor = ({
               liveEl.firstElementChild.style.setProperty(cssPropName, applyVal, 'important');
               Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty(cssPropName, applyVal, 'important'));
             }
-            
+
             // General Auto-resize for layout-affecting properties
             const layoutProps = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight', 'textAlign', 'textTransform'];
             if (layoutProps.includes(attribute) && liveEl.getAttribute('data-scrollable') !== 'true') {
               const div = liveEl.firstElementChild;
               div.style.setProperty('height', 'auto', 'important');
               div.style.setProperty('min-height', '0px', 'important');
-              
+
               const contentH = div.scrollHeight;
               const foH = parseFloat(liveEl.getAttribute('height')) || 0;
-              
+
               if (Math.abs(contentH - foH) > 2) {
-                 liveEl.setAttribute('height', contentH + 4);
-                 window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
+                liveEl.setAttribute('height', contentH + 4);
+                window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
               }
             }
           }
@@ -1003,7 +1003,7 @@ const TextEditor = ({
           if (styleProp) {
             let applyVal = finalVal;
             if (styleProp === 'fontFamily' && typeof applyVal === 'string' && !applyVal.includes("'") && !applyVal.includes('"')) {
-               applyVal = `'${applyVal}'`;
+              applyVal = `'${applyVal}'`;
             }
             if (styleProp === 'strokeWidth') {
               liveEl.setAttribute('stroke-width', value);
@@ -1066,7 +1066,7 @@ const TextEditor = ({
         if (overlay) {
           let overlayVal = finalVal;
           if (styleProp === 'fontFamily' && typeof overlayVal === 'string' && !overlayVal.includes("'") && !overlayVal.includes('"')) {
-             overlayVal = `'${overlayVal}'`;
+            overlayVal = `'${overlayVal}'`;
           }
           const overlayProp = styleProp === 'fill' ? 'color' : styleProp;
           overlay.style.setProperty(overlayProp, overlayVal, 'important');
@@ -1096,13 +1096,13 @@ const TextEditor = ({
             liveEl.firstElementChild.style.height = 'auto';
             liveEl.firstElementChild.style.borderRadius = '0';
             liveEl.firstElementChild.style.border = 'none';
-            
+
             // Immediately recalculate and expand the height since the scrollable constraint is removed
             const contentH = liveEl.firstElementChild.scrollHeight;
             const foH = parseFloat(liveEl.getAttribute('height')) || 0;
             if (Math.abs(contentH - foH) > 2) {
-               liveEl.setAttribute('height', contentH + 4);
-               window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
+              liveEl.setAttribute('height', contentH + 4);
+              window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
             }
           }
         }
@@ -1219,10 +1219,10 @@ const TextEditor = ({
               if (liveEl.getAttribute('data-scrollable') !== 'true') {
                 liveEl.firstElementChild.style.setProperty('height', 'auto', 'important');
                 liveEl.firstElementChild.style.setProperty('min-height', '0px', 'important');
-                
+
                 const contentH = liveEl.firstElementChild.scrollHeight;
                 const foH = parseFloat(liveEl.getAttribute('height')) || 0;
-                
+
                 if (Math.abs(contentH - foH) > 2) {
                   liveEl.setAttribute('height', contentH + 4);
                   window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
@@ -1869,9 +1869,9 @@ const TextEditor = ({
       if (tspans.length > 1) {
         const dy = tspans[1].getAttribute('dy');
         if (dy && dy.endsWith('em')) {
-           return parseFloat(dy);
+          return parseFloat(dy);
         }
-        
+
         // Calculate from consecutive y coordinates (Figma logic)
         const y1 = parseFloat(tspans[0].getAttribute('y'));
         let y2 = NaN;
@@ -1883,10 +1883,10 @@ const TextEditor = ({
           }
         }
         if (!isNaN(y1) && !isNaN(y2)) {
-           const dyPx = Math.abs(y2 - y1);
-           const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
-           const fontSize = parseFloat(fontSizeStr) || 16;
-           return parseFloat((dyPx / fontSize).toFixed(2));
+          const dyPx = Math.abs(y2 - y1);
+          const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
+          const fontSize = parseFloat(fontSizeStr) || 16;
+          return parseFloat((dyPx / fontSize).toFixed(2));
         }
       } else if (tspans.length === 1) {
         return 1.5;
@@ -1993,73 +1993,73 @@ const TextEditor = ({
       setTextContent(content);
 
       // Update styles
-        const ff = getDeepStyle(el, 'fontFamily');
-        const fs = getDeepStyle(el, 'fontSize');
-        const targetEl = el.tagName.toLowerCase() === 'foreignobject' && el.firstElementChild ? el.firstElementChild : el;
-        const style = window.getComputedStyle(targetEl);
+      const ff = getDeepStyle(el, 'fontFamily');
+      const fs = getDeepStyle(el, 'fontSize');
+      const targetEl = el.tagName.toLowerCase() === 'foreignobject' && el.firstElementChild ? el.firstElementChild : el;
+      const style = window.getComputedStyle(targetEl);
 
-        if (ff) setFontFamily(ff.replace(/['"]/g, '').split(',')[0]);
-        if (fs) {
-          let fontSizeVal = parseInt(fs);
-          const transform = el.getAttribute('transform');
-          if (transform && transform.includes('matrix') && el.tagName.toLowerCase() !== 'foreignobject') {
-            const match = transform.match(/matrix\(([^)]+)\)/);
-            if (match) {
-              const vals = match[1].split(/[ ,]+/).map(parseFloat);
-              if (vals.length >= 4) {
-                const scaleY = Math.sqrt(vals[2] * vals[2] + vals[3] * vals[3]);
-                if (scaleY > 0) fontSizeVal = Math.round(fontSizeVal * scaleY);
-              }
+      if (ff) setFontFamily(ff.replace(/['"]/g, '').split(',')[0]);
+      if (fs) {
+        let fontSizeVal = parseInt(fs);
+        const transform = el.getAttribute('transform');
+        if (transform && transform.includes('matrix') && el.tagName.toLowerCase() !== 'foreignobject') {
+          const match = transform.match(/matrix\(([^)]+)\)/);
+          if (match) {
+            const vals = match[1].split(/[ ,]+/).map(parseFloat);
+            if (vals.length >= 4) {
+              const scaleY = Math.sqrt(vals[2] * vals[2] + vals[3] * vals[3]);
+              if (scaleY > 0) fontSizeVal = Math.round(fontSizeVal * scaleY);
             }
           }
-          setFontSize(fontSizeVal);
         }
+        setFontSize(fontSizeVal);
+      }
 
-        const weight = style.fontWeight || el.getAttribute('font-weight');
-        const normalizedWeight = weight === 'bold' ? '700' : (weight === 'normal' ? '400' : weight);
-        if (normalizedWeight) setFontWeight(normalizedWeight.toString());
+      const weight = style.fontWeight || el.getAttribute('font-weight');
+      const normalizedWeight = weight === 'bold' ? '700' : (weight === 'normal' ? '400' : weight);
+      if (normalizedWeight) setFontWeight(normalizedWeight.toString());
 
-        const fontStyleVal = style.fontStyle || el.getAttribute('font-style');
-        if (fontStyleVal && fontStyleVal !== 'normal') setFontStyle(fontStyleVal);
-        else setFontStyle('normal');
+      const fontStyleVal = style.fontStyle || el.getAttribute('font-style');
+      if (fontStyleVal && fontStyleVal !== 'normal') setFontStyle(fontStyleVal);
+      else setFontStyle('normal');
 
-        const textDeco = style.textDecorationLine && style.textDecorationLine !== 'none' ? style.textDecorationLine : (style.textDecoration && !style.textDecoration.includes('none') ? style.textDecoration : el.getAttribute('text-decoration'));
-        if (textDeco && !textDeco.includes('none')) setTextDecoration(textDeco);
-        else setTextDecoration('none');
+      const textDeco = style.textDecorationLine && style.textDecorationLine !== 'none' ? style.textDecorationLine : (style.textDecoration && !style.textDecoration.includes('none') ? style.textDecoration : el.getAttribute('text-decoration'));
+      if (textDeco && !textDeco.includes('none')) setTextDecoration(textDeco);
+      else setTextDecoration('none');
 
-        let alignVal = style.textAlign;
-        if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
-           const anchor = el.getAttribute('text-anchor');
-           if (anchor === 'middle') alignVal = 'center';
-           else if (anchor === 'end') alignVal = 'right';
-           else if (anchor === 'start') alignVal = 'left';
-        } else {
-           if (alignVal === 'start') alignVal = 'left';
-           if (alignVal === 'end') alignVal = 'right';
-        }
-        if (alignVal) setTextAlign(alignVal);
+      let alignVal = style.textAlign;
+      if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
+        const anchor = el.getAttribute('text-anchor');
+        if (anchor === 'middle') alignVal = 'center';
+        else if (anchor === 'end') alignVal = 'right';
+        else if (anchor === 'start') alignVal = 'left';
+      } else {
+        if (alignVal === 'start') alignVal = 'left';
+        if (alignVal === 'end') alignVal = 'right';
+      }
+      if (alignVal) setTextAlign(alignVal);
 
-        const textTransformVal = style.textTransform || el.getAttribute('text-transform');
-        if (textTransformVal) setTextTransform(textTransformVal);
-        else setTextTransform('none');
+      const textTransformVal = style.textTransform || el.getAttribute('text-transform');
+      if (textTransformVal) setTextTransform(textTransformVal);
+      else setTextTransform('none');
 
-        // Sync Letter Spacing
-        let ls = style.letterSpacing;
-        if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
-          ls = el.getAttribute('letter-spacing') || ls;
-        }
-        if (ls && ls !== 'normal') {
-          setLetterSpacing(parseFloat(ls));
-        } else {
-          setLetterSpacing(0);
-        }
+      // Sync Letter Spacing
+      let ls = style.letterSpacing;
+      if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
+        ls = el.getAttribute('letter-spacing') || ls;
+      }
+      if (ls && ls !== 'normal') {
+        setLetterSpacing(parseFloat(ls));
+      } else {
+        setLetterSpacing(0);
+      }
 
-        // Sync Line Height
-        const lh = calculateLineHeightMultiplier();
-        setLineHeight(lh);
+      // Sync Line Height
+      const lh = calculateLineHeightMultiplier();
+      setLineHeight(lh);
 
-        // Sync Effects
-        syncTextEffect(null, el);
+      // Sync Effects
+      syncTextEffect(null, el);
     };
 
     // Initial sync

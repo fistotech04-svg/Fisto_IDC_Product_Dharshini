@@ -388,8 +388,8 @@ const ImageEditor = ({
   const [effectSettings, setEffectSettings] = useState({
     'Drop Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
     'Inner Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
-    'Blur': { blur: 4, spread: 0 },
-    'Background Blur': { blur: 4, spread: 0 }
+    'Blur': { blur: 1, spread: 0 },
+    'Background Blur': { blur: 1, spread: 0 }
   });
 
   const [activeColorPicker, setActiveColorPicker] = useState(null); // 'fill' | 'stroke' | null
@@ -2447,10 +2447,10 @@ const ImageEditor = ({
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 0.25vw; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 0.5vw; }
-        input[type='range'] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type='range']::-webkit-slider-runnable-track { height: 0.2vw; border-radius: 0.1vw; background: inherit; }
-        input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; height: 1vw; width: 1vw; border-radius: 50%; background: #4D47FF; border: 0.02vw solid #ffffff; box-shadow: 0 0.15vw 0.5vw rgba(77,71,255,0.4); margin-top: -0.55vw; cursor: pointer; transition: box-shadow 0.15s ease; }
-        input[type='range']::-webkit-slider-thumb:hover { box-shadow: 0 0.15vw 0.75vw rgba(77,71,255,0.6); }
+        .custom-range-slider { -webkit-appearance: none; width: 100%; background: transparent; }
+        .custom-range-slider::-webkit-slider-runnable-track { height: 0.2vw; border-radius: 0.1vw; background: inherit; }
+        .custom-range-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 1vw; width: 1vw; border-radius: 50%; background: #4D47FF; border: 0.02vw solid #ffffff; box-shadow: 0 0.15vw 0.5vw rgba(77,71,255,0.4); margin-top: -0.55vw; cursor: pointer; transition: box-shadow 0.15s ease; }
+        .custom-range-slider::-webkit-slider-thumb:hover { box-shadow: 0 0.15vw 0.75vw rgba(77,71,255,0.6); }
         
         .image-editor-toggle {
           appearance: none;
@@ -2863,7 +2863,7 @@ const ImageEditor = ({
                       max="100"
                       value={opacity}
                       onChange={(e) => setOpacity(Number(e.target.value))}
-                      className="w-full cursor-pointer"
+                      className="w-full cursor-pointer custom-range-slider"
                       style={{ backgroundImage: `linear-gradient(to right, #4D47FF 0%, #4D47FF ${opacity}%, #E2E8F0 ${opacity}%, #E2E8F0 100%)` }}
                     />
                   </div>
@@ -3062,7 +3062,7 @@ const ImageEditor = ({
                     if (activeColorPicker === 'fill') {
                       setBackgroundColor(p => ({ ...p, fill: color }));
                     } else {
-                      setBackgroundColor(p => ({ ...p, stroke: color }));
+                      setBackgroundColor(p => ({ ...p, stroke: color, strokeWeight: (p.strokeWeight === 0 && color !== 'transparent' && color !== 'none') ? 2 : p.strokeWeight }));
                     }
                   }}
                   onClose={() => setActiveColorPicker(null)}
