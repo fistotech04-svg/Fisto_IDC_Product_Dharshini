@@ -74,73 +74,20 @@ const parseLayersFromSVG = (element) => {
         (child.tagName.toLowerCase() === 'foreignobject' && child.getAttribute('data-type') !== 'video' && child.getAttribute('data-type') !== 'iframe');
 
       if (isGroup || isText) {
-        let activeEffects = [];
-
-        if (isGroup) {
-          const activeEffectsStr = child.getAttribute('data-active-effects') || '';
-          activeEffects = activeEffectsStr.split(',').filter(Boolean);
-        } else if (isText) {
-          if (child.getAttribute('data-effect-drop-shadow') === 'true') activeEffects.push('Drop Shadow');
-          if (child.getAttribute('data-effect-inner-shadow') === 'true') activeEffects.push('Inner Shadow');
-        }
-
-        const strokeAttr = child.getAttribute('stroke') || child.getAttribute('data-stroke-color');
-        const hasStroke = strokeAttr && strokeAttr !== 'none' && strokeAttr !== 'transparent';
-        const fillAttr = child.getAttribute('fill') || child.getAttribute('data-fill-color');
-        const hasFill = (fillAttr && fillAttr !== 'none' && fillAttr !== 'transparent') || isText; // text almost always has a fill
-
-        const virtualLayers = [];
-
-        // Order for UI rendering (will be reversed in Layer.jsx): Drop Shadow, Fill Color, Image/Video/GIF, Inner Shadow, Stroke
-        if (activeEffects.includes('Drop Shadow')) {
-          virtualLayers.push({ id: `${layer.id}-effect-drop-shadow`, name: 'Drop Shadow', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
-        }
-        if (hasFill) {
-          virtualLayers.push({ id: `${layer.id}-effect-fill`, name: 'Fill Color', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
-        }
-
-        // Ensure core layer is present
+        // Ensure core layer type is determined for proper icon rendering
         let coreType = 'image';
-        let coreName = 'Image';
         if (child.getAttribute('data-is-video-group') === 'true') {
           coreType = 'video';
-          coreName = 'Video';
         } else if (child.getAttribute('data-is-gif-group') === 'true') {
           coreType = 'image';
-          coreName = 'GIF';
         } else if (isText) {
           coreType = 'text';
-          coreName = 'Text';
         }
 
-        const imgChildIdx = layer.children ? layer.children.findIndex(c => c.type === coreType || c.name === coreName || c.name === 'Image' || c.name === 'Text') : -1;
-        let imgLayer = null;
-        if (imgChildIdx !== -1) {
-          imgLayer = layer.children.splice(imgChildIdx, 1)[0];
-        } else {
-          imgLayer = { id: `${layer.id}-core`, name: coreName, type: coreType, visible: layer.visible, locked: true };
-        }
-        imgLayer.parentId = layer.id;
-        imgLayer.isVirtualImageChild = true;
-        virtualLayers.push(imgLayer);
-
-        if (activeEffects.includes('Inner Shadow')) {
-          virtualLayers.push({ id: `${layer.id}-effect-inner-shadow`, name: 'Inner Shadow', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
-        }
-        if (hasStroke) {
-          virtualLayers.push({ id: `${layer.id}-effect-stroke`, name: 'Stroke', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
-        }
-
-        // Include any other remaining children
-        if (layer.children && layer.children.length > 0) {
-          layer.children.forEach(c => {
-            c.parentId = layer.id;
-            c.isVirtualImageChild = true;
-            virtualLayers.push(c);
-          });
-        }
-
-        layer.children = virtualLayers;
+        // Flatten the structural group so it acts as a single element in the Layer panel
+        delete layer.children;
+        layer.type = coreType;
+        layer.isStructuralGroup = true;
       }
 
       return [layer];
@@ -2478,7 +2425,7 @@ const TemplateEditor = () => {
       if (!safeStr.includes('xmlns:xlink=')) safeStr = safeStr.replace('<svg ', '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ');
       let doc = parser.parseFromString(safeStr, 'image/svg+xml');
       if (doc.querySelector('parsererror')) doc = parser.parseFromString(safeStr, 'text/html');
-      
+
       let element = doc.getElementById(elementId);
       if (!element) {
         element = doc.querySelector(`[data-name="${elementId}"]`);

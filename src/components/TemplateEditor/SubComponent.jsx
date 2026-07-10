@@ -636,7 +636,7 @@ const ShapePropertiesUI = ({
                   ].map((corner, idx) => {
                     const val = parseInt(selectedElementProps[corner.key] !== undefined ? selectedElementProps[corner.key] : (selectedElementProps.rx || 0));
                     const updateVal = (newVal) => {
-                      const clamped = Math.max(0, newVal);
+                      const clamped = Math.min(50, Math.max(0, newVal));
                       if (selectedElementProps['data-corner-linked'] !== 'false') {
                         updateAttr('rx', clamped);
                         updateAttr('ry', clamped);
@@ -655,7 +655,7 @@ const ShapePropertiesUI = ({
                           onPointerDown={(e) => {
                             // Only initiate drag if not clicking directly inside the numeric input
                             if (e.target.tagName === 'INPUT') return;
-                            handleScrubHelper(e, val, (newVal) => updateVal(parseInt(newVal)));
+                            handleScrubHelper(e, val, (newVal) => updateVal(parseInt(newVal)), 30); // Increased sensitivity to 30 for finer control
                           }}
                           className={`w-[5.2vw] h-[2.8vw] border border-gray-400 ${corner.roundedClass} flex items-center justify-between px-[0.4vw] bg-white relative transition-colors hover:border-gray-600 cursor-ew-resize select-none`}
                         >
@@ -669,6 +669,7 @@ const ShapePropertiesUI = ({
                           <input
                             type="number"
                             min={0}
+                            max={50}
                             value={val}
                             onChange={(e) => updateVal(parseInt(e.target.value) || 0)}
                             className="w-full text-center text-[1vw] font-semibold text-gray-700 outline-none no-spin bg-transparent cursor-text"
@@ -1164,6 +1165,7 @@ const ShapePropertiesUI = ({
         >
           <div className="animate-in fade-in zoom-in-95 duration-200">
             <ColorPicker
+              disableGradient={activeColorPicker === 'stroke' && (selectedElementProps?.tagName === 'text' || selectedElementProps?.tagName === 'foreignobject' || selectedElementProps?.['data-shape-type'] === 'text')}
               color={(() => {
                 if (activeColorPicker.includes('effect-')) {
                   return selectedElementProps[activeColorPicker] || '#000000';

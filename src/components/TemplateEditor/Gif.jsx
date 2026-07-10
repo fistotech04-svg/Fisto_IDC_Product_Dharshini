@@ -347,15 +347,17 @@ const GifEditor = ({
       }
 
       const getPathD = (x, y, w, h, tlv, trv, brv, blv) => {
+        const arc = (r, ex, ey) => r > 0 ? `A ${r},${r} 0 0 1 ${ex},${ey} ` : `L ${ex},${ey} `;
         return `M ${x + tlv},${y} ` +
           `L ${x + w - trv},${y} ` +
-          `Q ${x + w},${y} ${x + w},${y + trv} ` +
+          arc(trv, x + w, y + trv) +
           `L ${x + w},${y + h - brv} ` +
-          `Q ${x + w},${y + h} ${x + w - brv},${y + h} ` +
+          arc(brv, x + w - brv, y + h) +
           `L ${x + blv},${y + h} ` +
-          `Q ${x},${y + h} ${x},${y + h - blv} ` +
+          arc(blv, x, y + h - blv) +
           `L ${x},${y + tlv} ` +
-          `Q ${x},${y} ${x + tlv},${y} Z`;
+          arc(tlv, x + tlv, y) +
+          `Z`;
       };
 
       const f = filters;
@@ -580,7 +582,7 @@ const GifEditor = ({
         let fillLayer = liveElement.querySelector('.gif-fill-layer');
         if (backgroundColor.fill !== 'transparent' && backgroundColor.fill !== 'none') {
           if (!fillLayer) {
-            fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             fillLayer.classList.add('gif-fill-layer');
             fillLayer.setAttribute('data-name', 'Fill Color');
             fillLayer.style.pointerEvents = 'none';
@@ -593,10 +595,31 @@ const GifEditor = ({
               if (svgImageEl && svgImageEl.parentNode?.tagName?.toLowerCase() === 'svg' && svgImageEl.parentNode.classList.contains('svg-crop-wrapper')) {
                 targetEl = svgImageEl.parentNode;
               }
-              fillLayer.setAttribute('x', targetEl.getAttribute('x') || '0');
-              fillLayer.setAttribute('y', targetEl.getAttribute('y') || '0');
-              fillLayer.setAttribute('width', targetEl.getAttribute('width') || '100%');
-              fillLayer.setAttribute('height', targetEl.getAttribute('height') || '100%');
+              let bBox = { x: 0, y: 0, width: 100, height: 100 };
+              try { bBox = targetEl.getBBox(); } catch (e) {}
+              
+              let bxStr = targetEl.getAttribute('x') || '0';
+              let byStr = targetEl.getAttribute('y') || '0';
+              let bwStr = targetEl.getAttribute('width') || '100%';
+              let bhStr = targetEl.getAttribute('height') || '100%';
+              
+              let bx = bxStr.includes('%') ? bBox.x : parseFloat(bxStr) || 0;
+              let by = byStr.includes('%') ? bBox.y : parseFloat(byStr) || 0;
+              let bw = bwStr.includes('%') ? bBox.width : parseFloat(bwStr) || 100;
+              let bh = bhStr.includes('%') ? bBox.height : parseFloat(bhStr) || 100;
+
+              const tl = parseFloat(liveElement.getAttribute('data-effect-radius-tl') || '0');
+              const tr = parseFloat(liveElement.getAttribute('data-effect-radius-tr') || '0');
+              const br = parseFloat(liveElement.getAttribute('data-effect-radius-br') || '0');
+              const bl = parseFloat(liveElement.getAttribute('data-effect-radius-bl') || '0');
+
+              const maxR = Math.min(bw, bh) / 2;
+              const c_tl = Math.max(0, Math.min(tl, maxR));
+              const c_tr = Math.max(0, Math.min(tr, maxR));
+              const c_br = Math.max(0, Math.min(br, maxR));
+              const c_bl = Math.max(0, Math.min(bl, maxR));
+
+              fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), c_tl, c_tr, c_br, c_bl));
               fillLayer.setAttribute('transform', targetEl.getAttribute('transform') || '');
               fillLayer.style.transform = targetEl.style.transform;
               fillLayer.style.translate = targetEl.style.translate;
@@ -619,10 +642,26 @@ const GifEditor = ({
           if (svgImageEl && svgImageEl.parentNode?.tagName?.toLowerCase() === 'svg' && svgImageEl.parentNode.classList.contains('svg-crop-wrapper')) {
             targetEl = svgImageEl.parentNode;
           }
-          fillLayer.setAttribute('x', targetEl.getAttribute('x') || '0');
-          fillLayer.setAttribute('y', targetEl.getAttribute('y') || '0');
-          fillLayer.setAttribute('width', targetEl.getAttribute('width') || '100%');
-          fillLayer.setAttribute('height', targetEl.getAttribute('height') || '100%');
+          let box = { x: 0, y: 0, width: 100, height: 100 };
+          try { box = targetEl.getBBox(); } catch (e) { }
+
+          let bxStr = targetEl.getAttribute('x') || '0';
+          let byStr = targetEl.getAttribute('y') || '0';
+          let bwStr = targetEl.getAttribute('width') || '100%';
+          let bhStr = targetEl.getAttribute('height') || '100%';
+
+          let bx = bxStr.includes('%') ? box.x : parseFloat(bxStr) || 0;
+          let by = byStr.includes('%') ? box.y : parseFloat(byStr) || 0;
+          let bw = bwStr.includes('%') ? box.width : parseFloat(bwStr) || 100;
+          let bh = bhStr.includes('%') ? box.height : parseFloat(bhStr) || 100;
+
+          const maxRFill = Math.min(bw, bh) / 2;
+          const fill_tl = Math.max(0, Math.min(radius.tl || 0, maxRFill));
+          const fill_tr = Math.max(0, Math.min(radius.tr || 0, maxRFill));
+          const fill_br = Math.max(0, Math.min(radius.br || 0, maxRFill));
+          const fill_bl = Math.max(0, Math.min(radius.bl || 0, maxRFill));
+
+          fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), fill_tl, fill_tr, fill_br, fill_bl));
           fillLayer.setAttribute('transform', targetEl.getAttribute('transform') || '');
           fillLayer.style.transform = targetEl.style.transform;
           fillLayer.style.translate = targetEl.style.translate;
@@ -669,16 +708,6 @@ const GifEditor = ({
             liveElement.removeAttribute('data-fill-angle');
           }
           fillLayer.setAttribute('fill-opacity', (backgroundColor.fillOpacity / 100).toString());
-
-          const bw = parseFloat(targetEl.getAttribute('width')) || 100;
-          const bh = parseFloat(targetEl.getAttribute('height')) || 100;
-          const maxR = Math.min(bw, bh) / 2;
-          const maxRFill = Math.max(radius.tl || 0, radius.tr || 0, radius.br || 0, radius.bl || 0);
-          if (maxRFill > 0) {
-            fillLayer.setAttribute('rx', Math.max(0, Math.min(maxRFill, maxR)).toString());
-          } else {
-            fillLayer.removeAttribute('rx');
-          }
 
           liveElement.setAttribute('data-fill-color', backgroundColor.fill);
         } else {

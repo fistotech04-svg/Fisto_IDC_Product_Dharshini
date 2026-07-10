@@ -1958,6 +1958,12 @@ const MainEditor = ({
   const drawOverlayHighlight = (el, type) => {
     if (!el || typeof el.getBBox !== 'function' || typeof el.getScreenCTM !== 'function') return;
 
+    // PREVENT inner children of structural groups from getting highlights (avoids inner dashed lines)
+    const parentGroup = el.closest('g[data-is-image-group="true"], g[data-is-video-group="true"], g[data-is-gif-group="true"]');
+    if (parentGroup && parentGroup !== el) {
+      return;
+    }
+
     const overlay = getOverlayForElement(el);
     if (!overlay) return;
 
@@ -2098,7 +2104,11 @@ const MainEditor = ({
         polygon.removeAttribute('stroke-dasharray');
       } else if (type === 'entered') {
         polygon.setAttribute('stroke-width', String(1 / zoomScale));
-        polygon.setAttribute('stroke-dasharray', `${4 / zoomScale},${4 / zoomScale}`);
+        if (el.getAttribute('data-is-image-group') === 'true' || el.getAttribute('data-is-video-group') === 'true' || el.getAttribute('data-is-gif-group') === 'true') {
+          polygon.removeAttribute('stroke-dasharray');
+        } else {
+          polygon.setAttribute('stroke-dasharray', `${4 / zoomScale},${4 / zoomScale}`);
+        }
       }
 
       // ── RESIZE HANDLES (8 handles) ──
@@ -3561,6 +3571,13 @@ const MainEditor = ({
 
   // Helper: get direct children of a given element that have IDs
   const getDirectChildFrames = (el) => {
+    // PREVENT drill-down into structural groups (keeps them monolithic)
+    if (el.getAttribute('data-is-image-group') === 'true' || 
+        el.getAttribute('data-is-video-group') === 'true' || 
+        el.getAttribute('data-is-gif-group') === 'true') {
+      return [];
+    }
+
     return Array.from(el.children).filter(child =>
       child.id &&
       child.tagName.toLowerCase() !== 'style' &&
@@ -3657,6 +3674,12 @@ const MainEditor = ({
     // If clicking on a tspan, promote to parent text element first
     if (current && current.tagName?.toLowerCase() === 'tspan') {
       current = current.parentElement || current.parentNode;
+    }
+
+    // Figma-like auto-promotion for image groups: always drag the entire group
+    const imgGroup = current?.closest ? current.closest('g[data-is-image-group="true"]') : null;
+    if (imgGroup && imgGroup !== canvasRoot) {
+      return imgGroup;
     }
 
     while (current && current !== canvasRoot && current.tagName) {
@@ -8044,30 +8067,6 @@ const ClearIcon = () => (
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
   </svg>
-);
-
-const DeleteIcon = () => (
-  <svg width="0.9vw" height="0.9vw" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"></polyline>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-  </svg>
-);
-
-const MenuOption = ({ icon, label, onClick, color = "text-gray-700", hoverColor = "hover:bg-gray-50" }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-[0.6vw] px-[0.8vw] py-[0.5vw] text-[0.75vw] font-medium transition-colors rounded-[0.4vw] text-left cursor-pointer ${color} ${hoverColor}`}
-  >
-    <span className="flex-shrink-0">{icon}</span>
-    <span className="truncate">{label}</span>
-  </button>
-);
-
-export default MainEditor;
-<svg width="0.9vw" height="0.9vw" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-  <circle cx="12" cy="12" r="10"></circle>
-  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-</svg>
 );
 
 const DeleteIcon = () => (

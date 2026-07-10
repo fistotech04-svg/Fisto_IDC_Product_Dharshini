@@ -14,9 +14,9 @@ import Model3DEditor from './Model3DEditor';
 import { useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
-const RightSidebar = ({ 
-  isDoublePage, 
-  setIsDoublePage, 
+const RightSidebar = ({
+  isDoublePage,
+  setIsDoublePage,
   activeMainTool,
   setActiveMainTool,
   activeTopTool,
@@ -35,7 +35,7 @@ const RightSidebar = ({
   onCustomizePopup,
   onApplyPopupChanges,
   onCancelPopupChanges,
-  is3DModalOpen, 
+  is3DModalOpen,
   setIs3DModalOpen,
   preview3DDataUrl,
   setCurrent3DItem,
@@ -48,7 +48,7 @@ const RightSidebar = ({
   bgType, setBgType,
   bgColor, setBgColor,
   customBg, setCustomBg,
-    enableAR, setEnableAR,
+  enableAR, setEnableAR,
   qrText, setQrText, qrColor, setQrColor, qrBgType, setQrBgType, qrBgColor, setQrBgColor, qrLevel, setQrLevel, qrDotType, setQrDotType, qrCornerSquareType, setQrCornerSquareType, qrCornerDotType, setQrCornerDotType, qrLogo, setQrLogo,
   topText, setTopText, bottomText, setBottomText
 }) => {
@@ -70,10 +70,10 @@ const RightSidebar = ({
   const interactionMenuRef = useRef(null);
 
   const convertValue = (mmValue) => {
-     const val = parseFloat(mmValue || 0);
-     if (dimensionUnit === 'px') return Math.round(val * 96 / 25.4);
-     if (dimensionUnit === 'cm') return (val / 10).toFixed(2);
-     return Math.round(val); // mm
+    const val = parseFloat(mmValue || 0);
+    if (dimensionUnit === 'px') return Math.round(val * 96 / 25.4);
+    if (dimensionUnit === 'cm') return (val / 10).toFixed(2);
+    return Math.round(val); // mm
   };
 
   // Close unit dropdown on click outside
@@ -133,15 +133,15 @@ const RightSidebar = ({
 
     // Optional: Limit raw file size to 15MB
     if (file.size > 20 * 1024 * 1024) {
-        alert("File is too large! Please upload images smaller than 20MB.");
-        e.target.value = '';
-        return;
+      alert("File is too large! Please upload images smaller than 20MB.");
+      e.target.value = '';
+      return;
     }
 
     const isVideo = file.type.startsWith('video/');
     const isGif = file.type === 'image/gif';
     const isSvg = file.type === 'image/svg+xml';
-    
+
     const storedUser = localStorage.getItem('user');
     const user = storedUser ? JSON.parse(storedUser) : null;
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -230,8 +230,8 @@ const RightSidebar = ({
 
       // Dispatch event to MainEditor
       window.dispatchEvent(new CustomEvent('upload-image-to-editor', {
-        detail: { 
-          dataUrl: finalUrl, 
+        detail: {
+          dataUrl: finalUrl,
           pageIndex: activePageIndex,
           dataType: isSvg ? 'svg' : 'image'
         }
@@ -250,13 +250,13 @@ const RightSidebar = ({
 
         // If it's already small enough, no need to downscale
         if (width <= maxWidth && height <= maxHeight) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.75));
-            return;
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+          return;
         }
 
         if (width > maxWidth) {
@@ -286,88 +286,88 @@ const RightSidebar = ({
       const parser = new DOMParser();
       const doc = parser.parseFromString(page.html, 'image/svg+xml');
       const el = doc.getElementById(selectedLayerId);
-      
+
       const rootId = doc.querySelector('svg > g')?.id;
       const overlayId = doc.querySelector('[data-name="Overlay"]')?.id;
       const isPageSelected = !selectedLayerId || selectedLayerId === rootId || selectedLayerId === overlayId;
-      
+
       if (el && !isPageSelected) {
         let w = '0', h = '0', x = '0', y = '0', r = '0';
-        
+
         // --- IMPROVED DIMENSION LOGIC: Try actual DOM first for rendered accuracy ---
         const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
         const actualEl = editorDoc.getElementById(selectedLayerId);
         if (actualEl && typeof actualEl.getBBox === 'function') {
-           try {
-              const bbox = actualEl.getBBox();
-              w = bbox.width.toString();
-              h = bbox.height.toString();
-              x = bbox.x.toString();
-              y = bbox.y.toString();
-              
-              // If there's a matrix transform, it usually handles position.
-              // In this editor, interact.js uses matrix transforms for movement.
-              const transform = actualEl.getAttribute('transform');
-              if (transform && transform.includes('matrix')) {
-                 const match = transform.match(/matrix\(([^)]+)\)/);
-                 if (match) {
-                    const m = match[1].split(/[\s,]+/).map(parseFloat);
-                    // matrix(a, b, c, d, e, f) -> e, f are translation
-                    if (m.length === 6) {
-                       x = (parseFloat(x) + m[4]).toString();
-                       y = (parseFloat(y) + m[5]).toString();
-                       // Width/Height are already "local" to the matrix if we use getBBox(),
-                       // but visual width/height should include scaling.
-                       w = (parseFloat(w) * Math.abs(m[0])).toString();
-                       h = (parseFloat(h) * Math.abs(m[3])).toString();
-                    }
-                 }
+          try {
+            const bbox = actualEl.getBBox();
+            w = bbox.width.toString();
+            h = bbox.height.toString();
+            x = bbox.x.toString();
+            y = bbox.y.toString();
+
+            // If there's a matrix transform, it usually handles position.
+            // In this editor, interact.js uses matrix transforms for movement.
+            const transform = actualEl.getAttribute('transform');
+            if (transform && transform.includes('matrix')) {
+              const match = transform.match(/matrix\(([^)]+)\)/);
+              if (match) {
+                const m = match[1].split(/[\s,]+/).map(parseFloat);
+                // matrix(a, b, c, d, e, f) -> e, f are translation
+                if (m.length === 6) {
+                  x = (parseFloat(x) + m[4]).toString();
+                  y = (parseFloat(y) + m[5]).toString();
+                  // Width/Height are already "local" to the matrix if we use getBBox(),
+                  // but visual width/height should include scaling.
+                  w = (parseFloat(w) * Math.abs(m[0])).toString();
+                  h = (parseFloat(h) * Math.abs(m[3])).toString();
+                }
               }
-           } catch (e) {
-              console.warn("Failed to get BBox for element", e);
-           }
+            }
+          } catch (e) {
+            console.warn("Failed to get BBox for element", e);
+          }
         }
 
         // --- FALLBACK / OVERRIDE: Tags that have preferred source of truth ---
         if (el.tagName === 'rect') {
-           // For simple rects, use attributes if transform is NOT present
-           if (!el.getAttribute('transform')) {
-              w = el.getAttribute('width') || w;
-              h = el.getAttribute('height') || h;
-              x = el.getAttribute('x') || x;
-              y = el.getAttribute('y') || y;
-           }
-           r = el.getAttribute('rx') || '0';
+          // For simple rects, use attributes if transform is NOT present
+          if (!el.getAttribute('transform')) {
+            w = el.getAttribute('width') || w;
+            h = el.getAttribute('height') || h;
+            x = el.getAttribute('x') || x;
+            y = el.getAttribute('y') || y;
+          }
+          r = el.getAttribute('rx') || '0';
         } else if (el.tagName === 'circle') {
-           const radius = parseFloat(el.getAttribute('r')) || 0;
-           w = (radius * 2).toString();
-           h = w;
-           // Use cx/cy for position if no matrix
-           if (!el.getAttribute('transform')) {
-              x = (parseFloat(el.getAttribute('cx') || '0') - radius).toString();
-              y = (parseFloat(el.getAttribute('cy') || '0') - radius).toString();
-           }
+          const radius = parseFloat(el.getAttribute('r')) || 0;
+          w = (radius * 2).toString();
+          h = w;
+          // Use cx/cy for position if no matrix
+          if (!el.getAttribute('transform')) {
+            x = (parseFloat(el.getAttribute('cx') || '0') - radius).toString();
+            y = (parseFloat(el.getAttribute('cy') || '0') - radius).toString();
+          }
         } else if (el.tagName === 'ellipse') {
-           const rx = parseFloat(el.getAttribute('rx')) || 0;
-           const ry = parseFloat(el.getAttribute('ry')) || 0;
-           w = (rx * 2).toString();
-           h = (ry * 2).toString();
-           if (!el.getAttribute('transform')) {
-              x = (parseFloat(el.getAttribute('cx') || '0') - rx).toString();
-              y = (parseFloat(el.getAttribute('cy') || '0') - ry).toString();
-           }
+          const rx = parseFloat(el.getAttribute('rx')) || 0;
+          const ry = parseFloat(el.getAttribute('ry')) || 0;
+          w = (rx * 2).toString();
+          h = (ry * 2).toString();
+          if (!el.getAttribute('transform')) {
+            x = (parseFloat(el.getAttribute('cx') || '0') - rx).toString();
+            y = (parseFloat(el.getAttribute('cy') || '0') - ry).toString();
+          }
         } else if (el.tagName === 'text') {
-           // x/y on text is start position, bbox handles the rest
-           if (!el.getAttribute('transform')) {
-              x = el.getAttribute('x') || x;
-              y = el.getAttribute('y') || y;
-           }
+          // x/y on text is start position, bbox handles the rest
+          if (!el.getAttribute('transform')) {
+            x = el.getAttribute('x') || x;
+            y = el.getAttribute('y') || y;
+          }
         } else if (el.tagName === 'image' || el.tagName === 'path' || el.tagName === 'g') {
-           // Fallback to width/height attributes if bbox failed or were zero
-           if (parseFloat(w) === 0) w = el.getAttribute('width') || '0';
-           if (parseFloat(h) === 0) h = el.getAttribute('height') || '0';
-           if (parseFloat(x) === 0) x = el.getAttribute('x') || '0';
-           if (parseFloat(y) === 0) y = el.getAttribute('y') || '0';
+          // Fallback to width/height attributes if bbox failed or were zero
+          if (parseFloat(w) === 0) w = el.getAttribute('width') || '0';
+          if (parseFloat(h) === 0) h = el.getAttribute('height') || '0';
+          if (parseFloat(x) === 0) x = el.getAttribute('x') || '0';
+          if (parseFloat(y) === 0) y = el.getAttribute('y') || '0';
         }
 
         let fillStyle = el.getAttribute('fill') || '#000000';
@@ -412,25 +412,25 @@ const RightSidebar = ({
         const dataType = el.getAttribute('data-type');
         const dataName = el.getAttribute('data-name');
         const fillValue = el.getAttribute('fill') || '';
-        
+
         // Detect if it's a shape filled with a pattern containing an image
         let isPatternImage = false;
         if (fillValue.startsWith('url(#')) {
-            const patternId = fillValue.match(/url\(#([^)]+)\)/)?.[1];
-            if (patternId) {
-                // Try finding the pattern in the document
-                const pattern = doc.getElementById(patternId) || doc.querySelector(`pattern[id="${patternId}"], [id="${patternId}"]`);
-                if (pattern) {
-                    // Templates often use <use xlink:href="#imageId"> inside <pattern>
-                    const hasUse = pattern.querySelector('use') !== null;
-                    const hasImage = pattern.querySelector('image, img') !== null;
-                    if (hasImage || hasUse) {
-                        isPatternImage = true;
-                    }
-                }
+          const patternId = fillValue.match(/url\(#([^)]+)\)/)?.[1];
+          if (patternId) {
+            // Try finding the pattern in the document
+            const pattern = doc.getElementById(patternId) || doc.querySelector(`pattern[id="${patternId}"], [id="${patternId}"]`);
+            if (pattern) {
+              // Templates often use <use xlink:href="#imageId"> inside <pattern>
+              const hasUse = pattern.querySelector('use') !== null;
+              const hasImage = pattern.querySelector('image, img') !== null;
+              if (hasImage || hasUse) {
+                isPatternImage = true;
+              }
             }
+          }
         }
-        
+
         // Check if it's an image or a group containing an image (very common in templates)
         const hasImageChild = el.querySelector('image, img') !== null;
         const lowerTagName = props.tagName.toLowerCase();
@@ -440,15 +440,15 @@ const RightSidebar = ({
         const isGifFile = src.toLowerCase().endsWith('.gif') || dataType === 'gif';
 
         const isPdfBackground = lowerDataName.includes('pdf background') || lowerId.includes('background') || dataType === 'pdf-background';
-        
-        const isImage = (lowerTagName.includes('image') || 
-                        lowerTagName === 'img' || 
-                        dataType === 'image' ||
-                        lowerDataName.includes('image') ||
-                        lowerId.includes('image') || 
-                        !!(el.getAttribute('href') || el.getAttribute('xlink:href')) ||
-                        (lowerTagName === 'g' && hasImageChild) ||
-                        isPatternImage) && !isGifFile && !isPdfBackground;
+
+        const isImage = (lowerTagName.includes('image') ||
+          lowerTagName === 'img' ||
+          dataType === 'image' ||
+          lowerDataName.includes('image') ||
+          lowerId.includes('image') ||
+          !!(el.getAttribute('href') || el.getAttribute('xlink:href')) ||
+          (lowerTagName === 'g' && hasImageChild) ||
+          isPatternImage) && !isGifFile && !isPdfBackground;
 
         const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif');
@@ -469,14 +469,14 @@ const RightSidebar = ({
   })();
 
   return (
-    <div 
+    <div
       className="bg-white border-l border-[#EEEEEE] flex flex-col overflow-hidden select-none flex-shrink-0 h-[92vh]"
       style={{ width: '24vw' }}
     >
       {activeMainTool === 'grid' && (
-        <IconGallery 
+        <IconGallery
           isOpen={true}
-          onClose={() => setActiveMainTool('select')} 
+          onClose={() => setActiveMainTool('select')}
           onSelect={(icon) => {
             window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
               detail: {
@@ -513,22 +513,22 @@ const RightSidebar = ({
       )}
       {/* ================= Display Controls (Header Section) ================= */}
       {!isPopupEditor && !is3DModalOpen && (
-      <div className="border-b border-gray-100 bg-gray-50 flex-shrink-0 flex flex-col justify-center px-[1.5vw] space-y-[0.5vh]" style={{ height: '8.5vh' }}>
-         {/* Double Page Toggle Row */}
+        <div className="border-b border-gray-100 bg-gray-50 flex-shrink-0 flex flex-col justify-center px-[1.5vw] space-y-[0.5vh]" style={{ height: '8.5vh' }}>
+          {/* Double Page Toggle Row */}
           <div className="flex items-center">
             {!isPdfProject && (
               <div className="flex items-center gap-[0.6vw]">
-                  <div 
-                     onClick={() => setIsDoublePage(!isDoublePage)}
-                     className={`w-[2.6vw] h-[1.4vw] rounded-full relative cursor-pointer transition-colors duration-300 ${isDoublePage ? 'bg-[#5145F6]' : 'bg-gray-200'} border-[0.1vw] border-transparent scale-90`}
-                  >
-                     <div className={`absolute top-[0.1vw] w-[1.1vw] h-[1.1vw] bg-white rounded-full transition-all duration-300 shadow-sm ${isDoublePage ? 'left-[1.3vw]' : 'left-[0.1vw]'}`}></div>
-                  </div>
-                  <span className="text-gray-700 font-medium text-[0.8vw]">Double Page</span>
+                <div
+                  onClick={() => setIsDoublePage(!isDoublePage)}
+                  className={`w-[2.6vw] h-[1.4vw] rounded-full relative cursor-pointer transition-colors duration-300 ${isDoublePage ? 'bg-[#5145F6]' : 'bg-gray-200'} border-[0.1vw] border-transparent scale-90`}
+                >
+                  <div className={`absolute top-[0.1vw] w-[1.1vw] h-[1.1vw] bg-white rounded-full transition-all duration-300 shadow-sm ${isDoublePage ? 'left-[1.3vw]' : 'left-[0.1vw]'}`}></div>
+                </div>
+                <span className="text-gray-700 font-medium text-[0.8vw]">Double Page</span>
               </div>
             )}
-         </div>
-      </div>
+          </div>
+        </div>
       )}
 
       {/* Persistent Dimension Section (Common for all) */}
@@ -536,135 +536,135 @@ const RightSidebar = ({
         <div className="bg-[#f6f6f6] px-[1.5vw] py-[0.8vw] border-b border-gray-100 flex-shrink-0">
           <div className="space-y-[0.8vw]">
             <div className="flex items-center gap-[0.4vw]">
-               <div className="relative" ref={unitRef}>
-                  <div 
-                     onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
-                     className="flex items-center gap-[0.3vw] cursor-pointer rounded-[0.3vw] transition-colors"
-                  >
-                     <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap tracking-wider">Dimension in {dimensionUnit}</span>
-                     <Icon icon="lucide:chevron-down" className={`transition-transform duration-200 ${isUnitDropdownOpen ? 'rotate-180' : ''}`} width="0.8vw" />
-                  </div>
-                  
-                  {isUnitDropdownOpen && (
-                     <div className="absolute top-full left-0 mt-[0.2vw] bg-white border border-gray-100 shadow-xl rounded-[0.5vw] py-[0.3vw] z-50 w-[5vw]">
-                        {['px', 'mm', 'cm'].map(u => (
-                           <div 
-                              key={u}
-                              onClick={() => {
-                                 setDimensionUnit(u);
-                                 setIsUnitDropdownOpen(false);
-                               }}
-                               className={`px-[0.8vw] py-[0.4vw] text-[0.75vw] font-semibold cursor-pointer transition-colors ${dimensionUnit === u ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}
-                            >
-                               {u}
-                            </div>
-                         ))}
-                      </div>
-                   )}
+              <div className="relative" ref={unitRef}>
+                <div
+                  onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
+                  className="flex items-center gap-[0.3vw] cursor-pointer rounded-[0.3vw] transition-colors"
+                >
+                  <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap tracking-wider">Dimension in {dimensionUnit}</span>
+                  <Icon icon="lucide:chevron-down" className={`transition-transform duration-200 ${isUnitDropdownOpen ? 'rotate-180' : ''}`} width="0.8vw" />
                 </div>
-                <div className="h-px flex-grow bg-gray-200"></div>
-             </div>
+
+                {isUnitDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-[0.2vw] bg-white border border-gray-100 shadow-xl rounded-[0.5vw] py-[0.3vw] z-50 w-[5vw]">
+                    {['px', 'mm', 'cm'].map(u => (
+                      <div
+                        key={u}
+                        onClick={() => {
+                          setDimensionUnit(u);
+                          setIsUnitDropdownOpen(false);
+                        }}
+                        className={`px-[0.8vw] py-[0.4vw] text-[0.75vw] font-semibold cursor-pointer transition-colors ${dimensionUnit === u ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {u}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="h-px flex-grow bg-gray-200"></div>
+            </div>
 
             <div className="flex items-center justify-center gap-[3vw]">
-               {/* Width */}
-                <div className="flex items-center gap-[0.4vw]">
-                   <span className="text-[0.85vw] font-medium text-gray-700 whitespace-nowrap">W :</span>
-                   <div className="flex items-center gap-[0.1vw]">
-                      {selectedElementProps && !selectedElementProps.isPdfBackground && (
-                         <ChevronLeft 
-                            size="0.85vw" 
-                            className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors" 
-                            onClick={() => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'width';
-                               const val = parseFloat(selectedElementProps.w || 0) - 1;
-                               const finalVal = tag === 'circle' ? (val/2).toString() : val.toString();
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      )}
-                      <div className={`w-[3.5vw] h-[1.8vw] border border-gray-300 rounded-[0.4vw] flex items-center justify-center shadow-sm ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'bg-gray-100' : 'bg-white'}`}>
-                         <input 
-                            key={`w-${dimensionUnit}`}
-                            className={`w-full text-center bg-transparent outline-none text-[0.85vw] font-semibold ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'text-gray-400 cursor-not-allowed' : 'text-[#111827]'}`}
-                            value={convertValue(selectedElementProps?.w || flipbookDimensions.width)}
-                            readOnly={!selectedElementProps || selectedElementProps.isPdfBackground}
-                            onChange={(e) => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'width';
-                               const finalVal = tag === 'circle' ? (parseFloat(e.target.value)/2).toString() : e.target.value;
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      </div>
-                      {selectedElementProps && !selectedElementProps.isPdfBackground && (
-                         <ChevronRight 
-                            size="0.85vw" 
-                            className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
-                            onClick={() => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'width';
-                               const val = parseFloat(selectedElementProps.w || 0) + 1;
-                               const finalVal = tag === 'circle' ? (val/2).toString() : val.toString();
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      )}
-                   </div>
+              {/* Width */}
+              <div className="flex items-center gap-[0.4vw]">
+                <span className="text-[0.85vw] font-medium text-gray-700 whitespace-nowrap">W :</span>
+                <div className="flex items-center gap-[0.1vw]">
+                  {selectedElementProps && !selectedElementProps.isPdfBackground && (
+                    <ChevronLeft
+                      size="0.85vw"
+                      className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
+                      onClick={() => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'width';
+                        const val = parseFloat(selectedElementProps.w || 0) - 1;
+                        const finalVal = tag === 'circle' ? (val / 2).toString() : val.toString();
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  )}
+                  <div className={`w-[3.5vw] h-[1.8vw] border border-gray-300 rounded-[0.4vw] flex items-center justify-center shadow-sm ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'bg-gray-100' : 'bg-white'}`}>
+                    <input
+                      key={`w-${dimensionUnit}`}
+                      className={`w-full text-center bg-transparent outline-none text-[0.85vw] font-semibold ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'text-gray-400 cursor-not-allowed' : 'text-[#111827]'}`}
+                      value={convertValue(selectedElementProps?.w || flipbookDimensions.width)}
+                      readOnly={!selectedElementProps || selectedElementProps.isPdfBackground}
+                      onChange={(e) => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'width';
+                        const finalVal = tag === 'circle' ? (parseFloat(e.target.value) / 2).toString() : e.target.value;
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  </div>
+                  {selectedElementProps && !selectedElementProps.isPdfBackground && (
+                    <ChevronRight
+                      size="0.85vw"
+                      className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
+                      onClick={() => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'width';
+                        const val = parseFloat(selectedElementProps.w || 0) + 1;
+                        const finalVal = tag === 'circle' ? (val / 2).toString() : val.toString();
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  )}
                 </div>
+              </div>
 
-               {/* Height */}
-               <div className="flex items-center gap-[0.4vw]">
-                   <span className="text-[0.85vw] font-medium text-gray-700 whitespace-nowrap">H :</span>
-                   <div className="flex items-center gap-[0.1vw]">
-                      {selectedElementProps && !selectedElementProps.isPdfBackground && (
-                         <ChevronLeft 
-                            size="0.85vw" 
-                            className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
-                            onClick={() => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'height';
-                               const val = parseFloat(selectedElementProps.h || 0) - 1;
-                               const finalVal = tag === 'circle' ? (val/2).toString() : val.toString();
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      )}
-                      <div className={`w-[3.5vw] h-[1.8vw] border border-gray-300 rounded-[0.4vw] flex items-center justify-center shadow-sm ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'bg-gray-100' : 'bg-white'}`}>
-                         <input 
-                            key={`h-${dimensionUnit}`}
-                            className={`w-full text-center bg-transparent outline-none text-[0.85vw] font-semibold ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'text-gray-400 cursor-not-allowed' : 'text-[#111827]'}`}
-                            value={convertValue(selectedElementProps?.h || flipbookDimensions.height)}
-                            readOnly={!selectedElementProps || selectedElementProps.isPdfBackground}
-                            onChange={(e) => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'height';
-                               const finalVal = tag === 'circle' ? (parseFloat(e.target.value)/2).toString() : e.target.value;
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      </div>
-                      {selectedElementProps && !selectedElementProps.isPdfBackground && (
-                         <ChevronRight 
-                            size="0.85vw" 
-                            className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
-                            onClick={() => {
-                               if (!selectedElementProps) return;
-                               const tag = selectedElementProps.tagName;
-                               const attr = tag === 'circle' ? 'r' : 'height';
-                               const val = parseFloat(selectedElementProps.h || 0) + 1;
-                               const finalVal = tag === 'circle' ? (val/2).toString() : val.toString();
-                               updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
-                            }}
-                         />
-                      )}
-                   </div>
+              {/* Height */}
+              <div className="flex items-center gap-[0.4vw]">
+                <span className="text-[0.85vw] font-medium text-gray-700 whitespace-nowrap">H :</span>
+                <div className="flex items-center gap-[0.1vw]">
+                  {selectedElementProps && !selectedElementProps.isPdfBackground && (
+                    <ChevronLeft
+                      size="0.85vw"
+                      className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
+                      onClick={() => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'height';
+                        const val = parseFloat(selectedElementProps.h || 0) - 1;
+                        const finalVal = tag === 'circle' ? (val / 2).toString() : val.toString();
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  )}
+                  <div className={`w-[3.5vw] h-[1.8vw] border border-gray-300 rounded-[0.4vw] flex items-center justify-center shadow-sm ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'bg-gray-100' : 'bg-white'}`}>
+                    <input
+                      key={`h-${dimensionUnit}`}
+                      className={`w-full text-center bg-transparent outline-none text-[0.85vw] font-semibold ${(!selectedElementProps || selectedElementProps.isPdfBackground) ? 'text-gray-400 cursor-not-allowed' : 'text-[#111827]'}`}
+                      value={convertValue(selectedElementProps?.h || flipbookDimensions.height)}
+                      readOnly={!selectedElementProps || selectedElementProps.isPdfBackground}
+                      onChange={(e) => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'height';
+                        const finalVal = tag === 'circle' ? (parseFloat(e.target.value) / 2).toString() : e.target.value;
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  </div>
+                  {selectedElementProps && !selectedElementProps.isPdfBackground && (
+                    <ChevronRight
+                      size="0.85vw"
+                      className="text-gray-400 cursor-pointer hover:text-[#5145F6] transition-colors"
+                      onClick={() => {
+                        if (!selectedElementProps) return;
+                        const tag = selectedElementProps.tagName;
+                        const attr = tag === 'circle' ? 'r' : 'height';
+                        const val = parseFloat(selectedElementProps.h || 0) + 1;
+                        const finalVal = tag === 'circle' ? (val / 2).toString() : val.toString();
+                        updateElementAttribute(activePageIndex, selectedLayerId, attr, finalVal);
+                      }}
+                    />
+                  )}
                 </div>
+              </div>
             </div>
           </div>
         </div>
@@ -702,12 +702,12 @@ const RightSidebar = ({
                   onClick={handleUploadClick}
                   className="w-full h-[10vw] border-2 border-dashed rounded-[1.25vw] bg-white flex flex-col items-center justify-center p-[1vw] transition-all group shadow-sm border-gray-300 cursor-pointer hover:border-blue-500 hover:shadow-md"
                 >
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*,video/*,audio/*,.gif,.svg" 
-                    onChange={handleFileChange} 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.gif,.svg"
+                    onChange={handleFileChange}
                   />
                   <div className="text-[0.75vw] font-semibold text-gray-500 mb-[1.5vw] tracking-tight">
                     Drag & Drop or <span className="text-blue-600 font-bold">Upload</span>
@@ -725,7 +725,7 @@ const RightSidebar = ({
           ) : (
             <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
               {isPdfProject ? (
-                <InteractionPanel 
+                <InteractionPanel
                   selectedElementProps={selectedElementProps}
                   activePageIndex={activePageIndex}
                   selectedLayerId={selectedLayerId}
@@ -742,7 +742,7 @@ const RightSidebar = ({
                   {(selectedElementProps || activeMainTool === 'grid') ? (
                     <div className="flex flex-col gap-[1.5vw]">
                       {selectedElementProps?.isImage ? (
-                        <ImageEditor 
+                        <ImageEditor
                           selectedElement={(() => {
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
                             return editorDoc.getElementById(selectedLayerId);
@@ -761,7 +761,7 @@ const RightSidebar = ({
                                   const canvasContent = container.querySelector('[id^="canvas-content-"]');
                                   return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
                                 }
-                                
+
                                 let node = el;
                                 let lastSvg = null;
                                 while (node) {
@@ -806,7 +806,7 @@ const RightSidebar = ({
                                 if (!el) return null;
                                 const container = el.closest('.page-svg-container');
                                 if (container) return container.querySelector('svg');
-                                
+
                                 let node = el;
                                 let lastSvg = null;
                                 while (node) {
@@ -845,7 +845,7 @@ const RightSidebar = ({
                                 if (!el) return null;
                                 const container = el.closest('.page-svg-container');
                                 if (container) return container.querySelector('svg');
-                                
+
                                 let node = el;
                                 let lastSvg = null;
                                 while (node) {
@@ -884,7 +884,7 @@ const RightSidebar = ({
                                 if (!el) return null;
                                 const container = el.closest('.page-svg-container');
                                 if (container) return container.querySelector('svg');
-                                
+
                                 let node = el;
                                 let lastSvg = null;
                                 while (node) {
@@ -906,19 +906,19 @@ const RightSidebar = ({
                           activePageIndex={activePageIndex}
                         />
                       ) : (
-                        <ShapeProperties 
-                           selectedElementProps={selectedElementProps || { 
-                             fill: '#6366F1', 
-                             opacity: '1', 
-                             stroke: 'none', 
-                             strokeWidth: '0', 
-                             tagName: 'g',
-                             isIcon: true 
-                           }}
-                           activePageIndex={activePageIndex}
-                           selectedLayerId={selectedLayerId}
-                           updateElementAttribute={updateElementAttribute}
-                         />
+                        <ShapeProperties
+                          selectedElementProps={selectedElementProps || {
+                            fill: '#6366F1',
+                            opacity: '1',
+                            stroke: 'none',
+                            strokeWidth: '0',
+                            tagName: 'g',
+                            isIcon: true
+                          }}
+                          activePageIndex={activePageIndex}
+                          selectedLayerId={selectedLayerId}
+                          updateElementAttribute={updateElementAttribute}
+                        />
                       )}
                     </div>
                   ) : (
@@ -988,7 +988,7 @@ const RightSidebar = ({
             </div>
           )
         ) : activeTopTool === 'interaction' ? (
-          <InteractionPanel 
+          <InteractionPanel
             selectedElementProps={selectedElementProps}
             activePageIndex={activePageIndex}
             selectedLayerId={selectedLayerId}
@@ -1004,21 +1004,21 @@ const RightSidebar = ({
         ) : (
           /* Animation Mode */
           <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">
-            <AnimationPanel 
-               selectedElementProps={selectedElementProps}
-               flipbookDimensions={flipbookDimensions}
-               selectedLayerId={selectedLayerId}
-               selectedElement={(() => {
-                 if (!selectedLayerId) return null;
-                 const container = document.querySelector(`.page-svg-container [id="${selectedLayerId}"]`);
-                 if (container) return container;
-                 return document.getElementById(selectedLayerId) || null;
-               })()}
-               onUpdate={(elementId, attr, value) => {
-                  if (elementId && attr) {
-                      updateElementAttribute(activePageIndex, elementId, attr, value);
-                  }
-               }}
+            <AnimationPanel
+              selectedElementProps={selectedElementProps}
+              flipbookDimensions={flipbookDimensions}
+              selectedLayerId={selectedLayerId}
+              selectedElement={(() => {
+                if (!selectedLayerId) return null;
+                const container = document.querySelector(`.page-svg-container [id="${selectedLayerId}"]`);
+                if (container) return container;
+                return document.getElementById(selectedLayerId) || null;
+              })()}
+              onUpdate={(elementId, attr, value) => {
+                if (elementId && attr) {
+                  updateElementAttribute(activePageIndex, elementId, attr, value);
+                }
+              }}
             />
           </div>
         )}
