@@ -124,7 +124,8 @@ const LayerItem = ({
 
     switch (layer.type) {
       case 'g': return <Folder size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
-      case 'text': return <Type size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+      case 'text':
+      case 'foreignobject': return <Type size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
       case 'rect': return <Square size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
       case 'circle':
       case 'ellipse': return <Circle size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
@@ -138,7 +139,7 @@ const LayerItem = ({
 
   const handleItemClick = (e) => {
     e.stopPropagation();
-
+    
     const targetId = layer.isVirtualImageChild ? layer.parentId : layer.id;
 
     if (e.shiftKey) {
@@ -155,7 +156,7 @@ const LayerItem = ({
     }
   };
 
-  const handleContextMenu = (e) => {
+const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (onLayerContextMenu) {
@@ -443,10 +444,10 @@ const Layer = ({
   const activePageId = pages[activePageIndex]?.id;
   useEffect(() => {
     if (activePageId && isVisible) {
-      const elementId = activeTab === 'layers'
-        ? `page-card-${activePageId}`
+      const elementId = activeTab === 'layers' 
+        ? `page-card-${activePageId}` 
         : `page-card-preview-${activePageId}`;
-
+      
       const el = document.getElementById(elementId);
       if (el) {
         // Small timeout for layout stabilization
@@ -681,14 +682,14 @@ const Layer = ({
 
               const page = pages[activePageIndex];
               const clickedLayerName = page?.layers?.find(l => l.id === activeLayerMenu.layerId)?.name;
-
+              
               const realLayers = page?.layers ? page.layers.filter(l => l.name !== 'Free Frame') : [];
               const rootGroupLayer = (realLayers.length === 1 && (realLayers[0].name === page?.name || realLayers[0].name?.startsWith('Page '))) ? realLayers[0] : null;
-
-              const isPageBackground = activeLayerMenu.isOverlay ||
-                (page && activeLayerMenu.layerId === page.id) ||
-                clickedLayerName === 'Free Frame' ||
-                (rootGroupLayer && activeLayerMenu.layerId === rootGroupLayer.id);
+              
+              const isPageBackground = activeLayerMenu.isOverlay || 
+                                       (page && activeLayerMenu.layerId === page.id) || 
+                                       clickedLayerName === 'Free Frame' ||
+                                       (rootGroupLayer && activeLayerMenu.layerId === rootGroupLayer.id);
 
               const isRootLayer = isPageBackground ||
                 (page && page.layers && page.layers.some(l => l.id === activeLayerMenu.layerId));
@@ -700,7 +701,7 @@ const Layer = ({
                 } else {
                   pageLayerIds = realLayers.map(l => l.id);
                 }
-
+                
                 const cutCopyTargets = isPageBackground ? pageLayerIds : targetIds;
                 const disableCutCopy = isPageBackground && cutCopyTargets.length === 0;
 
@@ -739,6 +740,55 @@ const Layer = ({
                     >
                       <Clipboard size="0.9vw" /> Paste
                     </button>
+
+                    {isPageBackground && (
+                      <>
+                        <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                        {!isPdfProject && (
+                          <button
+                            onClick={() => { insertPageAfter && insertPageAfter(activePageIndex); setActiveLayerMenu(null); }}
+                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <Plus size="0.9vw" /> Add Page
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { onAddFile && onAddFile(activePageIndex); setActiveLayerMenu(null); }}
+                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <FilePlus size="0.9vw" /> Add File
+                        </button>
+                        <button
+                          onClick={() => { duplicatePage && duplicatePage(activePageIndex); setActiveLayerMenu(null); }}
+                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <Copy size="0.9vw" /> Duplicate
+                        </button>
+                        {!isPdfProject && (
+                          <button
+                            onClick={() => { onOpenTemplateModal && onOpenTemplateModal(activePageIndex); setActiveLayerMenu(null); }}
+                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <Layout size="0.9vw" /> Template
+                          </button>
+                        )}
+                        <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                        {!isPdfProject && (
+                          <button
+                            onClick={() => { clearPage && clearPage(activePageIndex); setActiveLayerMenu(null); }}
+                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <Ban size="0.9vw" /> Clear
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { deletePage && deletePage(activePageIndex); setActiveLayerMenu(null); }}
+                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-red-500 hover:bg-red-50 cursor-pointer"
+                        >
+                          <Trash2 size="0.9vw" /> Delete
+                        </button>
+                      </>
+                    )}
                   </>
                 );
               }
@@ -765,7 +815,7 @@ const Layer = ({
                       </button>
                     </>
                   )}
-
+                  
                   <button
                     onClick={() => {
                       if (!canGroup) return;
@@ -773,8 +823,9 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canGroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${!canGroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
-                      }`}
+                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
+                      !canGroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    }`}
                   >
                     <Icon icon="mdi-light:group" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
                     Group
@@ -786,8 +837,9 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canUngroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${!canUngroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
-                      }`}
+                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
+                      !canUngroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    }`}
                   >
                     <Icon icon="mdi-light:ungroup" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
                     Ungroup
@@ -1108,7 +1160,7 @@ const Layer = ({
                                       renameLayer={renameLayer}
                                       pageIndex={index}
                                       onLayerContextMenu={handleLayerContextMenu}
-                                      onReorderLayer={(sourceId, targetId) => reorderLayer(index, sourceId, targetId)}
+                                      onReorderLayer={reorderLayer}
                                       currentFrameId={currentFrameId}
                                       setCurrentFrameId={setCurrentFrameId}
                                     />
@@ -1238,7 +1290,6 @@ const Layer = ({
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`page-menu-${activeMenuPageId}`}
-                    ref={menuRef}
                     initial={{ opacity: 0, scale: 0.95, y: -5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
@@ -1248,13 +1299,46 @@ const Layer = ({
                       const element = document.getElementById(`page-card-${activeMenuPageId}`) ||
                         document.getElementById(`page-card-preview-${activeMenuPageId}`);
                       if (!element) return { display: 'none' };
+                      
                       const rect = element.getBoundingClientRect();
+
                       return {
                         position: 'fixed',
                         left: `calc(${rect.right}px + 0.6vw)`,
-                        top: `${Math.min(rect.top, window.innerHeight - 450)}px`
+                        maxHeight: 'calc(100vh - 20px)',
+                        overflowY: 'auto',
+                        transformOrigin: 'top left'
                       };
                     })()}
+                    ref={(node) => {
+                      // Preserve the existing menuRef for click-outside or other logic
+                      if (menuRef) {
+                        if (typeof menuRef === 'function') menuRef(node);
+                        else menuRef.current = node;
+                      }
+                      if (!node) return;
+
+                      const element = document.getElementById(`page-card-${activeMenuPageId}`) ||
+                        document.getElementById(`page-card-preview-${activeMenuPageId}`);
+                      if (!element) return;
+
+                      // Use the ACTUAL rendered height of the menu
+                      const actualHeight = node.scrollHeight;
+                      const rect = element.getBoundingClientRect();
+                      let topPos = rect.top;
+
+                      // Shift up EXACTLY the amount needed if it overflows the bottom
+                      if (topPos + actualHeight > window.innerHeight - 10) {
+                        topPos = window.innerHeight - actualHeight - 10;
+                      }
+
+                      // Never overflow the top
+                      if (topPos < 10) {
+                        topPos = 10;
+                      }
+
+                      node.style.top = `${topPos}px`;
+                    }}
                     className="w-[12vw] bg-white rounded-[0.8vw] shadow-2xl border border-gray-100 p-[0.4vw] z-[9999] flex flex-col gap-[0.2vw]"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -1269,7 +1353,9 @@ const Layer = ({
                             <button onClick={() => { insertPageAfter(index); setActiveMenuPageId(null); }} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><Plus size="0.9vw" /> Add Page</button>
                           )}
                           <button onClick={() => { onAddFile && onAddFile(index); setActiveMenuPageId(null); }} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><FilePlus size="0.9vw" /> Add File</button>
-                          <button onClick={() => { onReplaceFile && onReplaceFile(index); setActiveMenuPageId(null); }} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><FileReplaceIcon icon="mdi:file-replace" className="w-[0.9vw] h-[0.9vw]" /> Replace File</button>
+                          {isPdfProject && (
+                            <button onClick={() => { onReplaceFile && onReplaceFile(index); setActiveMenuPageId(null); }} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><FileReplaceIcon icon="mdi:file-replace" className="w-[0.9vw] h-[0.9vw]" /> Replace File</button>
+                          )}
                           <button onClick={() => { duplicatePage(index); setActiveMenuPageId(null); }} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><Copy size="0.9vw" /> Duplicate</button>
                           <button onClick={(e) => handleRenameStart(e, page)} className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"><Edit2 size="0.9vw" /> Rename</button>
                           {!isPdfProject && (

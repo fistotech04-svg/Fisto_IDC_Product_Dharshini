@@ -201,10 +201,9 @@ const syncGradient = (doc, element, baseAttr) => {
     gradEl.id = gradId;
     // Calculate angle for linear gradients
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
-      // Convert angle to SVG coordinates
-      const mathAngle = angle - 90;
-      const angleRad = (mathAngle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
+      // Convert angle to SVG coordinates (0 deg is horizontal left-to-right)
+      const angleRad = (angle * Math.PI) / 180;
       const x1 = Math.round(50 - Math.cos(angleRad) * 50) + '%';
       const y1 = Math.round(50 - Math.sin(angleRad) * 50) + '%';
       const x2 = Math.round(50 + Math.cos(angleRad) * 50) + '%';
@@ -223,9 +222,8 @@ const syncGradient = (doc, element, baseAttr) => {
     defs.appendChild(gradEl);
   } else if (svgGradType === 'linear') {
     // Update existing linear gradient angle
-    const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
-    const mathAngle = angle - 90;
-    const angleRad = (mathAngle * Math.PI) / 180;
+    const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
+    const angleRad = (angle * Math.PI) / 180;
     gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
     gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
     gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
@@ -257,20 +255,20 @@ const syncGradient = (doc, element, baseAttr) => {
     if (baseAttr === 'fill') {
       let cssGradStr = '';
       if (svgGradType === 'linear') {
-        const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
+        const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
         cssGradStr = `linear-gradient(${angle}deg, ${stops.map(s => `${s.color} ${s.offset}%`).join(', ')})`;
       } else {
         cssGradStr = `radial-gradient(circle, ${stops.map(s => `${s.color} ${s.offset}%`).join(', ')})`;
       }
-
+      
       const applyCssGradToElement = (el) => {
-        el.style.setProperty('background-image', cssGradStr, 'important');
-        el.style.setProperty('-webkit-background-clip', 'text', 'important');
-        el.style.setProperty('background-clip', 'text', 'important');
-        el.style.setProperty('color', 'transparent', 'important');
-        el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+          el.style.setProperty('background-image', cssGradStr, 'important');
+          el.style.setProperty('-webkit-background-clip', 'text', 'important');
+          el.style.setProperty('background-clip', 'text', 'important');
+          el.style.setProperty('color', 'transparent', 'important');
+          el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
       };
-
+      
       applyCssGradToElement(element.firstElementChild);
       Array.from(element.firstElementChild.querySelectorAll('*')).forEach(applyCssGradToElement);
     }
@@ -575,7 +573,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     fillType: selectedElementProps?.['fill-type'] || 'solid',
     fillGradientType: selectedElementProps?.['fill-gradient-type'] || 'linear',
     fillStops: selectedElementProps?.['fill-stops'],
-    fillAngle: parseFloat(selectedElementProps?.['fill-angle'] !== undefined ? selectedElementProps['fill-angle'] : 180),
+    fillAngle: parseFloat(selectedElementProps?.['fill-angle'] || 0),
     fillRadius: parseFloat(selectedElementProps?.['fill-radius'] || 100),
     stroke: selectedElementProps?.stroke || 'none',
     strokeOpacity: 100,
@@ -584,7 +582,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     strokeType: selectedElementProps?.['stroke-type'] || 'solid',
     strokeGradientType: selectedElementProps?.['stroke-gradient-type'] || 'linear',
     strokeStops: selectedElementProps?.['stroke-stops'],
-    strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] !== undefined ? selectedElementProps['stroke-angle'] : 180),
+    strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] || 0),
     strokeRadius: parseFloat(selectedElementProps?.['stroke-radius'] || 100),
     strokeDashLength: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
     strokeDashGap: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[1] || (selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
@@ -639,7 +637,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       fillType: selectedElementProps?.['fill-type'] || 'solid',
       fillGradientType: selectedElementProps?.['fill-gradient-type'] || 'linear',
       fillStops: selectedElementProps?.['fill-stops'],
-      fillAngle: parseFloat(selectedElementProps?.['fill-angle'] !== undefined ? selectedElementProps['fill-angle'] : 180),
+      fillAngle: parseFloat(selectedElementProps?.['fill-angle'] || 0),
       fillRadius: parseFloat(selectedElementProps?.['fill-radius'] || 100),
       stroke: selectedElementProps?.stroke || 'none',
       strokeOpacity: 100,
@@ -648,7 +646,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       strokeType: selectedElementProps?.['stroke-type'] || 'solid',
       strokeGradientType: selectedElementProps?.['stroke-gradient-type'] || 'linear',
       strokeStops: selectedElementProps?.['stroke-stops'],
-      strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] !== undefined ? selectedElementProps['stroke-angle'] : 180),
+      strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] || 0),
       strokeRadius: parseFloat(selectedElementProps?.['stroke-radius'] || 100),
       strokeDashLength: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
       strokeDashGap: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[1] || (selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
@@ -680,27 +678,25 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
   useEffect(() => {
     if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     updateTimeoutRef.current = setTimeout(() => {
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill', backgroundColor.fill);
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'opacity', (backgroundColor.fillOpacity / 100).toString());
       if (backgroundColor.fillType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-type', backgroundColor.fillType);
       if (backgroundColor.fillGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-gradient-type', backgroundColor.fillGradientType);
       if (backgroundColor.fillStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-stops', backgroundColor.fillStops);
       if (backgroundColor.fillAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-angle', backgroundColor.fillAngle.toString());
       if (backgroundColor.fillRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-radius', backgroundColor.fillRadius.toString());
 
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill', backgroundColor.fill);
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'opacity', (backgroundColor.fillOpacity / 100).toString());
-
-      if (backgroundColor.strokeType === 'gradient' || backgroundColor.strokeStops) {
-        updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'gradient');
-        if (backgroundColor.strokeGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-gradient-type', backgroundColor.strokeGradientType);
-        if (backgroundColor.strokeStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-stops', backgroundColor.strokeStops);
-        if (backgroundColor.strokeAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-angle', backgroundColor.strokeAngle.toString());
-        if (backgroundColor.strokeRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-radius', backgroundColor.strokeRadius.toString());
-      } else if (backgroundColor.stroke !== 'none' && !backgroundColor.stroke.includes('url(#')) {
-        updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'solid');
-      }
-
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke', backgroundColor.stroke);
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeWidth', backgroundColor.strokeWeight.toString());
+      if (backgroundColor.strokeType === 'gradient' || backgroundColor.strokeStops) {
+          updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'gradient');
+          if (backgroundColor.strokeGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-gradient-type', backgroundColor.strokeGradientType);
+          if (backgroundColor.strokeStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-stops', backgroundColor.strokeStops);
+          if (backgroundColor.strokeAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-angle', backgroundColor.strokeAngle.toString());
+          if (backgroundColor.strokeRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-radius', backgroundColor.strokeRadius.toString());
+      } else if (backgroundColor.stroke !== 'none' && !backgroundColor.stroke.includes('url(#')) {
+          updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'solid');
+      }
 
       const dashVal = backgroundColor.strokeDashStyle === 'Dashed' ? `${backgroundColor.strokeDashLength || 5},${backgroundColor.strokeDashGap || 5}` : 'none';
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeDasharray', dashVal);
@@ -966,12 +962,11 @@ const TextEditor = ({
           if (liveEl.firstElementChild && styleProp) {
             let applyVal = finalVal;
             if (styleProp === 'fontFamily' && typeof applyVal === 'string' && !applyVal.includes("'") && !applyVal.includes('"')) {
-              applyVal = `'${applyVal}'`;
+               applyVal = `'${applyVal}'`;
             }
             if (styleProp === 'stroke') {
-              const strokeColor = finalVal === 'none' ? 'transparent' : finalVal;
-              liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
-              Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important'));
+              liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', finalVal, 'important');
+              Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-color', finalVal, 'important'));
             } else if (styleProp === 'strokeWidth') {
               liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important');
               Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important'));
@@ -980,32 +975,21 @@ const TextEditor = ({
               const cssPropName = liveProp.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
               liveEl.firstElementChild.style.setProperty(cssPropName, applyVal, 'important');
               Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty(cssPropName, applyVal, 'important'));
-              
-              if (styleProp === 'fill' && !applyVal.includes('url(')) {
-                const removeGrad = (el) => {
-                  el.style.removeProperty('background-image');
-                  el.style.removeProperty('-webkit-background-clip');
-                  el.style.removeProperty('background-clip');
-                  el.style.removeProperty('-webkit-text-fill-color');
-                };
-                removeGrad(liveEl.firstElementChild);
-                Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(removeGrad);
-              }
             }
-
+            
             // General Auto-resize for layout-affecting properties
             const layoutProps = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight', 'textAlign', 'textTransform'];
             if (layoutProps.includes(attribute) && liveEl.getAttribute('data-scrollable') !== 'true') {
               const div = liveEl.firstElementChild;
               div.style.setProperty('height', 'auto', 'important');
               div.style.setProperty('min-height', '0px', 'important');
-
+              
               const contentH = div.scrollHeight;
               const foH = parseFloat(liveEl.getAttribute('height')) || 0;
-
+              
               if (Math.abs(contentH - foH) > 2) {
-                liveEl.setAttribute('height', contentH + 4);
-                window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
+                 liveEl.setAttribute('height', contentH + 4);
+                 window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
               }
             }
           }
@@ -1015,18 +999,11 @@ const TextEditor = ({
             liveEl.firstElementChild.style.setProperty('paint-order', paintOrder, 'important');
             Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('paint-order', paintOrder, 'important'));
           }
-          
-          if (attribute === 'fill' || attribute === 'stroke') {
-            liveEl.setAttribute(attribute, value);
-          } else if (attribute === 'strokeWidth' || attribute === 'stroke-width') {
-            liveEl.setAttribute('stroke-width', value);
-            liveEl.setAttribute('strokeWidth', value);
-          }
         } else {
           if (styleProp) {
             let applyVal = finalVal;
             if (styleProp === 'fontFamily' && typeof applyVal === 'string' && !applyVal.includes("'") && !applyVal.includes('"')) {
-              applyVal = `'${applyVal}'`;
+               applyVal = `'${applyVal}'`;
             }
             if (styleProp === 'strokeWidth') {
               liveEl.setAttribute('stroke-width', value);
@@ -1089,7 +1066,7 @@ const TextEditor = ({
         if (overlay) {
           let overlayVal = finalVal;
           if (styleProp === 'fontFamily' && typeof overlayVal === 'string' && !overlayVal.includes("'") && !overlayVal.includes('"')) {
-            overlayVal = `'${overlayVal}'`;
+             overlayVal = `'${overlayVal}'`;
           }
           const overlayProp = styleProp === 'fill' ? 'color' : styleProp;
           overlay.style.setProperty(overlayProp, overlayVal, 'important');
@@ -1119,13 +1096,13 @@ const TextEditor = ({
             liveEl.firstElementChild.style.height = 'auto';
             liveEl.firstElementChild.style.borderRadius = '0';
             liveEl.firstElementChild.style.border = 'none';
-
+            
             // Immediately recalculate and expand the height since the scrollable constraint is removed
             const contentH = liveEl.firstElementChild.scrollHeight;
             const foH = parseFloat(liveEl.getAttribute('height')) || 0;
             if (Math.abs(contentH - foH) > 2) {
-              liveEl.setAttribute('height', contentH + 4);
-              window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
+               liveEl.setAttribute('height', contentH + 4);
+               window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
             }
           }
         }
@@ -1139,8 +1116,7 @@ const TextEditor = ({
           if (isScrollable && liveEl.firstElementChild) {
             const s = attribute === 'stroke' ? value : (liveEl.getAttribute('stroke') || 'none');
             const sw = (attribute === 'strokeWidth' || attribute === 'stroke-width') ? value : (liveEl.getAttribute('strokeWidth') || liveEl.getAttribute('stroke-width') || '0');
-            const strokeColor = s === 'none' ? 'transparent' : s;
-            liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
+            liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', s, 'important');
             liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${sw}px`, 'important');
             // Remove border just in case it was applied before
             liveEl.firstElementChild.style.border = 'none';
@@ -1243,10 +1219,10 @@ const TextEditor = ({
               if (liveEl.getAttribute('data-scrollable') !== 'true') {
                 liveEl.firstElementChild.style.setProperty('height', 'auto', 'important');
                 liveEl.firstElementChild.style.setProperty('min-height', '0px', 'important');
-
+                
                 const contentH = liveEl.firstElementChild.scrollHeight;
                 const foH = parseFloat(liveEl.getAttribute('height')) || 0;
-
+                
                 if (Math.abs(contentH - foH) > 2) {
                   liveEl.setAttribute('height', contentH + 4);
                   window.dispatchEvent(new CustomEvent('force-update-selection-box', { detail: { elementId: liveEl.id } }));
@@ -1432,20 +1408,12 @@ const TextEditor = ({
           if (tag === 'foreignobject') {
             if (element.firstElementChild) {
               if (styleProp === 'stroke') {
-                const strokeColor = finalVal === 'none' ? 'transparent' : finalVal;
-                element.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
+                element.firstElementChild.style.setProperty('-webkit-text-stroke-color', finalVal, 'important');
               } else if (styleProp === 'strokeWidth') {
                 element.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important');
               } else {
                 const cssPropName = finalProp.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
                 element.firstElementChild.style.setProperty(cssPropName, finalVal, 'important');
-                
-                if (styleProp === 'fill' && !finalVal.includes('url(')) {
-                  element.firstElementChild.style.removeProperty('background-image');
-                  element.firstElementChild.style.removeProperty('-webkit-background-clip');
-                  element.firstElementChild.style.removeProperty('background-clip');
-                  element.firstElementChild.style.removeProperty('-webkit-text-fill-color');
-                }
               }
 
               // --- SCROLLABLE PERSISTENCE ---
@@ -1901,9 +1869,9 @@ const TextEditor = ({
       if (tspans.length > 1) {
         const dy = tspans[1].getAttribute('dy');
         if (dy && dy.endsWith('em')) {
-          return parseFloat(dy);
+           return parseFloat(dy);
         }
-
+        
         // Calculate from consecutive y coordinates (Figma logic)
         const y1 = parseFloat(tspans[0].getAttribute('y'));
         let y2 = NaN;
@@ -1915,10 +1883,10 @@ const TextEditor = ({
           }
         }
         if (!isNaN(y1) && !isNaN(y2)) {
-          const dyPx = Math.abs(y2 - y1);
-          const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
-          const fontSize = parseFloat(fontSizeStr) || 16;
-          return parseFloat((dyPx / fontSize).toFixed(2));
+           const dyPx = Math.abs(y2 - y1);
+           const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
+           const fontSize = parseFloat(fontSizeStr) || 16;
+           return parseFloat((dyPx / fontSize).toFixed(2));
         }
       } else if (tspans.length === 1) {
         return 1.5;
@@ -2025,73 +1993,73 @@ const TextEditor = ({
       setTextContent(content);
 
       // Update styles
-      const ff = getDeepStyle(el, 'fontFamily');
-      const fs = getDeepStyle(el, 'fontSize');
-      const targetEl = el.tagName.toLowerCase() === 'foreignobject' && el.firstElementChild ? el.firstElementChild : el;
-      const style = window.getComputedStyle(targetEl);
+        const ff = getDeepStyle(el, 'fontFamily');
+        const fs = getDeepStyle(el, 'fontSize');
+        const targetEl = el.tagName.toLowerCase() === 'foreignobject' && el.firstElementChild ? el.firstElementChild : el;
+        const style = window.getComputedStyle(targetEl);
 
-      if (ff) setFontFamily(ff.replace(/['"]/g, '').split(',')[0]);
-      if (fs) {
-        let fontSizeVal = parseInt(fs);
-        const transform = el.getAttribute('transform');
-        if (transform && transform.includes('matrix') && el.tagName.toLowerCase() !== 'foreignobject') {
-          const match = transform.match(/matrix\(([^)]+)\)/);
-          if (match) {
-            const vals = match[1].split(/[ ,]+/).map(parseFloat);
-            if (vals.length >= 4) {
-              const scaleY = Math.sqrt(vals[2] * vals[2] + vals[3] * vals[3]);
-              if (scaleY > 0) fontSizeVal = Math.round(fontSizeVal * scaleY);
+        if (ff) setFontFamily(ff.replace(/['"]/g, '').split(',')[0]);
+        if (fs) {
+          let fontSizeVal = parseInt(fs);
+          const transform = el.getAttribute('transform');
+          if (transform && transform.includes('matrix') && el.tagName.toLowerCase() !== 'foreignobject') {
+            const match = transform.match(/matrix\(([^)]+)\)/);
+            if (match) {
+              const vals = match[1].split(/[ ,]+/).map(parseFloat);
+              if (vals.length >= 4) {
+                const scaleY = Math.sqrt(vals[2] * vals[2] + vals[3] * vals[3]);
+                if (scaleY > 0) fontSizeVal = Math.round(fontSizeVal * scaleY);
+              }
             }
           }
+          setFontSize(fontSizeVal);
         }
-        setFontSize(fontSizeVal);
-      }
 
-      const weight = style.fontWeight || el.getAttribute('font-weight');
-      const normalizedWeight = weight === 'bold' ? '700' : (weight === 'normal' ? '400' : weight);
-      if (normalizedWeight) setFontWeight(normalizedWeight.toString());
+        const weight = style.fontWeight || el.getAttribute('font-weight');
+        const normalizedWeight = weight === 'bold' ? '700' : (weight === 'normal' ? '400' : weight);
+        if (normalizedWeight) setFontWeight(normalizedWeight.toString());
 
-      const fontStyleVal = style.fontStyle || el.getAttribute('font-style');
-      if (fontStyleVal && fontStyleVal !== 'normal') setFontStyle(fontStyleVal);
-      else setFontStyle('normal');
+        const fontStyleVal = style.fontStyle || el.getAttribute('font-style');
+        if (fontStyleVal && fontStyleVal !== 'normal') setFontStyle(fontStyleVal);
+        else setFontStyle('normal');
 
-      const textDeco = style.textDecorationLine && style.textDecorationLine !== 'none' ? style.textDecorationLine : (style.textDecoration && !style.textDecoration.includes('none') ? style.textDecoration : el.getAttribute('text-decoration'));
-      if (textDeco && !textDeco.includes('none')) setTextDecoration(textDeco);
-      else setTextDecoration('none');
+        const textDeco = style.textDecorationLine && style.textDecorationLine !== 'none' ? style.textDecorationLine : (style.textDecoration && !style.textDecoration.includes('none') ? style.textDecoration : el.getAttribute('text-decoration'));
+        if (textDeco && !textDeco.includes('none')) setTextDecoration(textDeco);
+        else setTextDecoration('none');
 
-      let alignVal = style.textAlign;
-      if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
-        const anchor = el.getAttribute('text-anchor');
-        if (anchor === 'middle') alignVal = 'center';
-        else if (anchor === 'end') alignVal = 'right';
-        else if (anchor === 'start') alignVal = 'left';
-      } else {
-        if (alignVal === 'start') alignVal = 'left';
-        if (alignVal === 'end') alignVal = 'right';
-      }
-      if (alignVal) setTextAlign(alignVal);
+        let alignVal = style.textAlign;
+        if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
+           const anchor = el.getAttribute('text-anchor');
+           if (anchor === 'middle') alignVal = 'center';
+           else if (anchor === 'end') alignVal = 'right';
+           else if (anchor === 'start') alignVal = 'left';
+        } else {
+           if (alignVal === 'start') alignVal = 'left';
+           if (alignVal === 'end') alignVal = 'right';
+        }
+        if (alignVal) setTextAlign(alignVal);
 
-      const textTransformVal = style.textTransform || el.getAttribute('text-transform');
-      if (textTransformVal) setTextTransform(textTransformVal);
-      else setTextTransform('none');
+        const textTransformVal = style.textTransform || el.getAttribute('text-transform');
+        if (textTransformVal) setTextTransform(textTransformVal);
+        else setTextTransform('none');
 
-      // Sync Letter Spacing
-      let ls = style.letterSpacing;
-      if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
-        ls = el.getAttribute('letter-spacing') || ls;
-      }
-      if (ls && ls !== 'normal') {
-        setLetterSpacing(parseFloat(ls));
-      } else {
-        setLetterSpacing(0);
-      }
+        // Sync Letter Spacing
+        let ls = style.letterSpacing;
+        if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
+          ls = el.getAttribute('letter-spacing') || ls;
+        }
+        if (ls && ls !== 'normal') {
+          setLetterSpacing(parseFloat(ls));
+        } else {
+          setLetterSpacing(0);
+        }
 
-      // Sync Line Height
-      const lh = calculateLineHeightMultiplier();
-      setLineHeight(lh);
+        // Sync Line Height
+        const lh = calculateLineHeightMultiplier();
+        setLineHeight(lh);
 
-      // Sync Effects
-      syncTextEffect(null, el);
+        // Sync Effects
+        syncTextEffect(null, el);
     };
 
     // Initial sync
@@ -2427,5 +2395,3 @@ const TextEditor = ({
 };
 
 export default TextEditor;
-
-

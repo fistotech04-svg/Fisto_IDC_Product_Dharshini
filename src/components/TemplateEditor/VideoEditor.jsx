@@ -232,7 +232,7 @@ const VideoEditor = ({
         strokeDashStyle: isDashed ? 'Dashed' : 'Solid',
         strokeGradientType: visualTarget.getAttribute('data-stroke-gradient-type') || 'linear',
         strokeStops: visualTarget.getAttribute('data-stroke-stops'),
-        strokeAngle: parseFloat(visualTarget.getAttribute('data-stroke-angle') || '180'),
+        strokeAngle: parseFloat(visualTarget.getAttribute('data-stroke-angle') || '0'),
         strokeRadius: parseFloat(visualTarget.getAttribute('data-stroke-radius') || '100'),
         strokeWeight: stWeight,
         strokeDashLength: dashLen,
@@ -445,20 +445,6 @@ const VideoEditor = ({
 
     isUpdatingDOM.current = true;
     try {
-      const getPathD = (x, y, w, h, tlv, trv, brv, blv) => {
-        const arc = (r, ex, ey) => r > 0 ? `A ${r},${r} 0 0 1 ${ex},${ey} ` : `L ${ex},${ey} `;
-        return `M ${x + tlv},${y} ` +
-          `L ${x + w - trv},${y} ` +
-          arc(trv, x + w, y + trv) +
-          `L ${x + w},${y + h - brv} ` +
-          arc(brv, x + w - brv, y + h) +
-          `L ${x + blv},${y + h} ` +
-          arc(blv, x, y + h - blv) +
-          `L ${x},${y + tlv} ` +
-          arc(tlv, x + tlv, y) +
-          `Z`;
-      };
-
       // Dimensions
       visualTarget.setAttribute('width', width);
       visualTarget.setAttribute('height', height);
@@ -483,7 +469,7 @@ const VideoEditor = ({
       let fillLayer = liveElement.querySelector('.video-fill-layer');
       if (backgroundColor.fill !== 'transparent' && backgroundColor.fill !== 'none') {
         if (!fillLayer) {
-          fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           fillLayer.classList.add('video-fill-layer');
           fillLayer.setAttribute('data-name', 'Fill Color');
           fillLayer.style.pointerEvents = 'none';
@@ -491,32 +477,10 @@ const VideoEditor = ({
 
           const syncFillOverlay = () => {
             if (!fillLayer.isConnected) return;
-            
-            let bBox = { x: 0, y: 0, width: 100, height: 100 };
-            try { bBox = visualTarget.getBBox(); } catch (e) {}
-            
-            let bxStr = visualTarget.getAttribute('x') || '0';
-            let byStr = visualTarget.getAttribute('y') || '0';
-            let bwStr = visualTarget.getAttribute('width') || '100%';
-            let bhStr = visualTarget.getAttribute('height') || '100%';
-            
-            let bx = bxStr.includes('%') ? bBox.x : parseFloat(bxStr) || 0;
-            let by = byStr.includes('%') ? bBox.y : parseFloat(byStr) || 0;
-            let bw = bwStr.includes('%') ? bBox.width : parseFloat(bwStr) || 100;
-            let bh = bhStr.includes('%') ? bBox.height : parseFloat(bhStr) || 100;
-
-            const tl = parseFloat(liveElement.getAttribute('data-effect-radius-tl') || '0');
-            const tr = parseFloat(liveElement.getAttribute('data-effect-radius-tr') || '0');
-            const br = parseFloat(liveElement.getAttribute('data-effect-radius-br') || '0');
-            const bl = parseFloat(liveElement.getAttribute('data-effect-radius-bl') || '0');
-
-            const maxR = Math.min(bw, bh) / 2;
-            const c_tl = Math.max(0, Math.min(tl, maxR));
-            const c_tr = Math.max(0, Math.min(tr, maxR));
-            const c_br = Math.max(0, Math.min(br, maxR));
-            const c_bl = Math.max(0, Math.min(bl, maxR));
-
-            fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), c_tl, c_tr, c_br, c_bl));
+            fillLayer.setAttribute('x', visualTarget.getAttribute('x') || '0');
+            fillLayer.setAttribute('y', visualTarget.getAttribute('y') || '0');
+            fillLayer.setAttribute('width', visualTarget.getAttribute('width') || '100%');
+            fillLayer.setAttribute('height', visualTarget.getAttribute('height') || '100%');
             fillLayer.setAttribute('transform', visualTarget.getAttribute('transform') || '');
             fillLayer.style.transform = visualTarget.style.transform;
             fillLayer.style.translate = visualTarget.style.translate;
@@ -531,26 +495,10 @@ const VideoEditor = ({
           }
         }
 
-        let box = { x: 0, y: 0, width: 100, height: 100 };
-        try { box = visualTarget.getBBox(); } catch (e) { }
-
-        let bxStr = visualTarget.getAttribute('x') || '0';
-        let byStr = visualTarget.getAttribute('y') || '0';
-        let bwStr = visualTarget.getAttribute('width') || '100%';
-        let bhStr = visualTarget.getAttribute('height') || '100%';
-
-        let bx = bxStr.includes('%') ? box.x : parseFloat(bxStr) || 0;
-        let by = byStr.includes('%') ? box.y : parseFloat(byStr) || 0;
-        let bw = bwStr.includes('%') ? box.width : parseFloat(bwStr) || 100;
-        let bh = bhStr.includes('%') ? box.height : parseFloat(bhStr) || 100;
-
-        const maxRFill = Math.min(bw, bh) / 2;
-        const fill_tl = Math.max(0, Math.min(radius.tl || 0, maxRFill));
-        const fill_tr = Math.max(0, Math.min(radius.tr || 0, maxRFill));
-        const fill_br = Math.max(0, Math.min(radius.br || 0, maxRFill));
-        const fill_bl = Math.max(0, Math.min(radius.bl || 0, maxRFill));
-
-        fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), fill_tl, fill_tr, fill_br, fill_bl));
+        fillLayer.setAttribute('x', visualTarget.getAttribute('x') || '0');
+        fillLayer.setAttribute('y', visualTarget.getAttribute('y') || '0');
+        fillLayer.setAttribute('width', visualTarget.getAttribute('width') || '100%');
+        fillLayer.setAttribute('height', visualTarget.getAttribute('height') || '100%');
         fillLayer.setAttribute('transform', visualTarget.getAttribute('transform') || '');
         fillLayer.style.transform = visualTarget.style.transform;
         fillLayer.style.translate = visualTarget.style.translate;
@@ -567,18 +515,18 @@ const VideoEditor = ({
           fillLayer.setAttribute('data-fill-type', 'gradient');
           fillLayer.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
           fillLayer.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          fillLayer.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+          fillLayer.setAttribute('data-fill-angle', parsedFill.angle || 90);
 
           fillLayer.setAttribute('fill-type', 'gradient');
           fillLayer.setAttribute('fill-stops', JSON.stringify(parsedFill.stops));
           fillLayer.setAttribute('fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          fillLayer.setAttribute('fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+          fillLayer.setAttribute('fill-angle', parsedFill.angle || 90);
 
           syncGradient(liveElement.ownerDocument || document, fillLayer, 'fill');
           liveElement.setAttribute('data-fill-type', 'gradient');
           liveElement.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
           liveElement.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          liveElement.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+          liveElement.setAttribute('data-fill-angle', parsedFill.angle || 90);
         } else {
           fillLayer.setAttribute('fill', backgroundColor.fill);
           fillLayer.removeAttribute('data-fill-type');
@@ -597,6 +545,13 @@ const VideoEditor = ({
           liveElement.removeAttribute('data-fill-angle');
         }
         fillLayer.setAttribute('fill-opacity', (backgroundColor.fillOpacity / 100).toString());
+
+        const maxRFill = Math.max(radius.tl || 0, radius.tr || 0, radius.br || 0, radius.bl || 0);
+        if (maxRFill > 0) {
+          fillLayer.setAttribute('rx', maxRFill.toString());
+        } else {
+          fillLayer.removeAttribute('rx');
+        }
 
         visualTarget.style.backgroundColor = 'transparent'; // clear foreignObject background
         visualTarget.setAttribute('data-bg-color', backgroundColor.fill);
@@ -654,7 +609,7 @@ const VideoEditor = ({
       if (isSvgEl && weight > 0) {
         let strokeOverlay = liveElement.querySelector('.svg-video-stroke-overlay');
         if (!strokeOverlay) {
-          strokeOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          strokeOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           strokeOverlay.classList.add('svg-video-stroke-overlay');
           strokeOverlay.style.pointerEvents = 'none';
           liveElement.appendChild(strokeOverlay);
@@ -695,13 +650,10 @@ const VideoEditor = ({
           ox -= weight / 2; oy -= weight / 2; ow += weight; oh += weight;
         }
 
-        const maxR = Math.min(ow, oh) / 2;
-        const c_tl = Math.max(0, Math.min(radius.tl || 0, maxR));
-        const c_tr = Math.max(0, Math.min(radius.tr || 0, maxR));
-        const c_br = Math.max(0, Math.min(radius.br || 0, maxR));
-        const c_bl = Math.max(0, Math.min(radius.bl || 0, maxR));
-        
-        strokeOverlay.setAttribute('d', getPathD(ox, oy, Math.max(0, ow), Math.max(0, oh), c_tl, c_tr, c_br, c_bl));
+        strokeOverlay.style.setProperty('x', `${ox}px`, 'important');
+        strokeOverlay.style.setProperty('y', `${oy}px`, 'important');
+        strokeOverlay.style.setProperty('width', `${Math.max(0, ow)}px`, 'important');
+        strokeOverlay.style.setProperty('height', `${Math.max(0, oh)}px`, 'important');
         strokeOverlay.setAttribute('transform', visualTarget.getAttribute('transform') || '');
         strokeOverlay.style.transform = visualTarget.style.transform;
         strokeOverlay.style.translate = visualTarget.style.translate;
@@ -716,13 +668,13 @@ const VideoEditor = ({
         if (backgroundColor.strokeType === 'gradient' && backgroundColor.strokeStops) {
           liveElement.setAttribute('data-stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
           liveElement.setAttribute('data-stroke-stops', backgroundColor.strokeStops || '');
-          liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
+          liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle || '0');
           liveElement.setAttribute('data-stroke-radius', backgroundColor.strokeRadius || '100');
 
           strokeOverlay.setAttribute('stroke-type', 'gradient');
           strokeOverlay.setAttribute('stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
           strokeOverlay.setAttribute('stroke-stops', backgroundColor.strokeStops || '');
-          strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
+          strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle || '0');
           strokeOverlay.setAttribute('stroke-radius', backgroundColor.strokeRadius || '100');
           syncGradient(liveElement.ownerDocument || document, strokeOverlay, 'stroke');
         } else {
@@ -748,6 +700,10 @@ const VideoEditor = ({
         }
         strokeOverlay.setAttribute('stroke-linecap', backgroundColor.strokeLinecap || 'butt');
         strokeOverlay.setAttribute('stroke-linejoin', (backgroundColor.strokeLinecap || 'butt') === 'round' ? 'round' : 'miter');
+
+        const maxR = Math.max(radius.tl, radius.tr, radius.br, radius.bl);
+        if (maxR > 0) strokeOverlay.setAttribute('rx', maxR.toString());
+        else strokeOverlay.removeAttribute('rx');
 
         strokeOverlay.style.outline = 'none';
         strokeOverlay.style.removeProperty('border-width');
@@ -776,30 +732,10 @@ const VideoEditor = ({
       }
 
       // Radius
-      const anyR = radius.tl > 0 || radius.tr > 0 || radius.br > 0 || radius.bl > 0;
       const radiusStr = `${radius.tl}px ${radius.tr}px ${radius.br}px ${radius.bl}px`;
-      if (isSvgEl) {
-        if (anyR) {
-          const clipVal = `inset(0% 0% 0% 0% round ${radiusStr})`;
-          visualTarget.style.clipPath = clipVal;
-          visualTarget.style.webkitClipPath = clipVal;
-        } else {
-          visualTarget.style.clipPath = '';
-          visualTarget.style.webkitClipPath = '';
-        }
-      }
       visualTarget.style.borderRadius = radiusStr;
-      if (container && target) {
-        target.style.borderRadius = radiusStr;
-      }
       visualTarget.setAttribute('data-radius', JSON.stringify(radius));
       visualTarget.style.overflow = 'hidden';
-      if (isSvgEl) {
-        liveElement.setAttribute('data-effect-radius-tl', (radius.tl || 0).toString());
-        liveElement.setAttribute('data-effect-radius-tr', (radius.tr || 0).toString());
-        liveElement.setAttribute('data-effect-radius-br', (radius.br || 0).toString());
-        liveElement.setAttribute('data-effect-radius-bl', (radius.bl || 0).toString());
-      }
 
       // Object Fit
       const fitMap = {
@@ -843,7 +779,7 @@ const VideoEditor = ({
       if (hasDropShadow && isSvgEl) {
         const effSet = effectSettings['Drop Shadow'];
         if (!shadowCaster) {
-          shadowCaster = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          shadowCaster = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           shadowCaster.classList.add('svg-drop-shadow-caster');
           shadowCaster.style.pointerEvents = 'none';
           liveElement.insertBefore(shadowCaster, liveElement.firstChild);
@@ -852,31 +788,18 @@ const VideoEditor = ({
           if (shadowCaster !== liveElement.firstChild) {
             liveElement.insertBefore(shadowCaster, liveElement.firstChild);
           }
-          
-          let box = { x: 0, y: 0, width: 100, height: 100 };
-          try { box = visualTarget.getBBox(); } catch (e) { }
-
-          let bxStr = visualTarget.getAttribute('x') || '0';
-          let byStr = visualTarget.getAttribute('y') || '0';
-          let bwStr = visualTarget.getAttribute('width') || '100%';
-          let bhStr = visualTarget.getAttribute('height') || '100%';
-
-          let bx = bxStr.includes('%') ? box.x : parseFloat(bxStr) || 0;
-          let by = byStr.includes('%') ? box.y : parseFloat(byStr) || 0;
-          let bw = bwStr.includes('%') ? box.width : parseFloat(bwStr) || 100;
-          let bh = bhStr.includes('%') ? box.height : parseFloat(bhStr) || 100;
-
-          const maxRFill = Math.min(bw, bh) / 2;
-          const fill_tl = Math.max(0, Math.min(radius.tl || 0, maxRFill));
-          const fill_tr = Math.max(0, Math.min(radius.tr || 0, maxRFill));
-          const fill_br = Math.max(0, Math.min(radius.br || 0, maxRFill));
-          const fill_bl = Math.max(0, Math.min(radius.bl || 0, maxRFill));
-
-          shadowCaster.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), fill_tl, fill_tr, fill_br, fill_bl));
+          shadowCaster.setAttribute('x', visualTarget.getAttribute('x') || '0');
+          shadowCaster.setAttribute('y', visualTarget.getAttribute('y') || '0');
+          shadowCaster.setAttribute('width', visualTarget.getAttribute('width') || '100%');
+          shadowCaster.setAttribute('height', visualTarget.getAttribute('height') || '100%');
           shadowCaster.setAttribute('transform', visualTarget.getAttribute('transform') || '');
 
           shadowCaster.setAttribute('fill', 'black');
           shadowCaster.setAttribute('fill-opacity', opacity / 100);
+
+          const maxR = Math.max(radius.tl, radius.tr, radius.br, radius.bl);
+          if (maxR > 0) shadowCaster.setAttribute('rx', maxR.toString());
+          else shadowCaster.removeAttribute('rx');
 
           const alpha = Math.round((effSet.opacity / 100) * 255).toString(16).padStart(2, '0');
           const shadowOnlyFilter = `drop-shadow(${effSet.x}px ${effSet.y}px ${effSet.blur}px ${effSet.color}${alpha})`;
@@ -2001,9 +1924,8 @@ function syncGradient(doc, element, baseAttr) {
     gradEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
     gradEl.id = gradId;
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
-      const mathAngle = angle - 90;
-      const angleRad = (mathAngle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
+      const angleRad = (angle * Math.PI) / 180;
       gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
       gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
       gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');

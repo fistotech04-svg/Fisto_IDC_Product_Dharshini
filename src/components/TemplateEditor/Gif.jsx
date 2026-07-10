@@ -347,17 +347,15 @@ const GifEditor = ({
       }
 
       const getPathD = (x, y, w, h, tlv, trv, brv, blv) => {
-        const arc = (r, ex, ey) => r > 0 ? `A ${r},${r} 0 0 1 ${ex},${ey} ` : `L ${ex},${ey} `;
         return `M ${x + tlv},${y} ` +
           `L ${x + w - trv},${y} ` +
-          arc(trv, x + w, y + trv) +
+          `Q ${x + w},${y} ${x + w},${y + trv} ` +
           `L ${x + w},${y + h - brv} ` +
-          arc(brv, x + w - brv, y + h) +
+          `Q ${x + w},${y + h} ${x + w - brv},${y + h} ` +
           `L ${x + blv},${y + h} ` +
-          arc(blv, x, y + h - blv) +
+          `Q ${x},${y + h} ${x},${y + h - blv} ` +
           `L ${x},${y + tlv} ` +
-          arc(tlv, x + tlv, y) +
-          `Z`;
+          `Q ${x},${y} ${x + tlv},${y} Z`;
       };
 
       const f = filters;
@@ -582,7 +580,7 @@ const GifEditor = ({
         let fillLayer = liveElement.querySelector('.gif-fill-layer');
         if (backgroundColor.fill !== 'transparent' && backgroundColor.fill !== 'none') {
           if (!fillLayer) {
-            fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            fillLayer = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             fillLayer.classList.add('gif-fill-layer');
             fillLayer.setAttribute('data-name', 'Fill Color');
             fillLayer.style.pointerEvents = 'none';
@@ -595,31 +593,10 @@ const GifEditor = ({
               if (svgImageEl && svgImageEl.parentNode?.tagName?.toLowerCase() === 'svg' && svgImageEl.parentNode.classList.contains('svg-crop-wrapper')) {
                 targetEl = svgImageEl.parentNode;
               }
-              let bBox = { x: 0, y: 0, width: 100, height: 100 };
-              try { bBox = targetEl.getBBox(); } catch (e) { }
-
-              let bxStr = targetEl.getAttribute('x') || '0';
-              let byStr = targetEl.getAttribute('y') || '0';
-              let bwStr = targetEl.getAttribute('width') || '100%';
-              let bhStr = targetEl.getAttribute('height') || '100%';
-
-              let bx = bxStr.includes('%') ? bBox.x : parseFloat(bxStr) || 0;
-              let by = byStr.includes('%') ? bBox.y : parseFloat(byStr) || 0;
-              let bw = bwStr.includes('%') ? bBox.width : parseFloat(bwStr) || 100;
-              let bh = bhStr.includes('%') ? bBox.height : parseFloat(bhStr) || 100;
-
-              const tl = parseFloat(liveElement.getAttribute('data-effect-radius-tl') || '0');
-              const tr = parseFloat(liveElement.getAttribute('data-effect-radius-tr') || '0');
-              const br = parseFloat(liveElement.getAttribute('data-effect-radius-br') || '0');
-              const bl = parseFloat(liveElement.getAttribute('data-effect-radius-bl') || '0');
-
-              const maxR = Math.min(bw, bh) / 2;
-              const c_tl = Math.max(0, Math.min(tl, maxR));
-              const c_tr = Math.max(0, Math.min(tr, maxR));
-              const c_br = Math.max(0, Math.min(br, maxR));
-              const c_bl = Math.max(0, Math.min(bl, maxR));
-
-              fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), c_tl, c_tr, c_br, c_bl));
+              fillLayer.setAttribute('x', targetEl.getAttribute('x') || '0');
+              fillLayer.setAttribute('y', targetEl.getAttribute('y') || '0');
+              fillLayer.setAttribute('width', targetEl.getAttribute('width') || '100%');
+              fillLayer.setAttribute('height', targetEl.getAttribute('height') || '100%');
               fillLayer.setAttribute('transform', targetEl.getAttribute('transform') || '');
               fillLayer.style.transform = targetEl.style.transform;
               fillLayer.style.translate = targetEl.style.translate;
@@ -642,26 +619,10 @@ const GifEditor = ({
           if (svgImageEl && svgImageEl.parentNode?.tagName?.toLowerCase() === 'svg' && svgImageEl.parentNode.classList.contains('svg-crop-wrapper')) {
             targetEl = svgImageEl.parentNode;
           }
-          let box = { x: 0, y: 0, width: 100, height: 100 };
-          try { box = targetEl.getBBox(); } catch (e) { }
-
-          let bxStr = targetEl.getAttribute('x') || '0';
-          let byStr = targetEl.getAttribute('y') || '0';
-          let bwStr = targetEl.getAttribute('width') || '100%';
-          let bhStr = targetEl.getAttribute('height') || '100%';
-
-          let bx = bxStr.includes('%') ? box.x : parseFloat(bxStr) || 0;
-          let by = byStr.includes('%') ? box.y : parseFloat(byStr) || 0;
-          let bw = bwStr.includes('%') ? box.width : parseFloat(bwStr) || 100;
-          let bh = bhStr.includes('%') ? box.height : parseFloat(bhStr) || 100;
-
-          const maxRFill = Math.min(bw, bh) / 2;
-          const fill_tl = Math.max(0, Math.min(radius.tl || 0, maxRFill));
-          const fill_tr = Math.max(0, Math.min(radius.tr || 0, maxRFill));
-          const fill_br = Math.max(0, Math.min(radius.br || 0, maxRFill));
-          const fill_bl = Math.max(0, Math.min(radius.bl || 0, maxRFill));
-
-          fillLayer.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), fill_tl, fill_tr, fill_br, fill_bl));
+          fillLayer.setAttribute('x', targetEl.getAttribute('x') || '0');
+          fillLayer.setAttribute('y', targetEl.getAttribute('y') || '0');
+          fillLayer.setAttribute('width', targetEl.getAttribute('width') || '100%');
+          fillLayer.setAttribute('height', targetEl.getAttribute('height') || '100%');
           fillLayer.setAttribute('transform', targetEl.getAttribute('transform') || '');
           fillLayer.style.transform = targetEl.style.transform;
           fillLayer.style.translate = targetEl.style.translate;
@@ -678,18 +639,18 @@ const GifEditor = ({
             fillLayer.setAttribute('data-fill-type', 'gradient');
             fillLayer.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
             fillLayer.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            fillLayer.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+            fillLayer.setAttribute('data-fill-angle', parsedFill.angle || 90);
 
             fillLayer.setAttribute('fill-type', 'gradient');
             fillLayer.setAttribute('fill-stops', JSON.stringify(parsedFill.stops));
             fillLayer.setAttribute('fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            fillLayer.setAttribute('fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+            fillLayer.setAttribute('fill-angle', parsedFill.angle || 90);
 
             syncGradient(liveElement.ownerDocument || document, fillLayer, 'fill');
             liveElement.setAttribute('data-fill-type', 'gradient');
             liveElement.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
             liveElement.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            liveElement.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
+            liveElement.setAttribute('data-fill-angle', parsedFill.angle || 90);
           } else {
             fillLayer.setAttribute('fill', backgroundColor.fill);
             fillLayer.removeAttribute('data-fill-type');
@@ -708,6 +669,16 @@ const GifEditor = ({
             liveElement.removeAttribute('data-fill-angle');
           }
           fillLayer.setAttribute('fill-opacity', (backgroundColor.fillOpacity / 100).toString());
+
+          const bw = parseFloat(targetEl.getAttribute('width')) || 100;
+          const bh = parseFloat(targetEl.getAttribute('height')) || 100;
+          const maxR = Math.min(bw, bh) / 2;
+          const maxRFill = Math.max(radius.tl || 0, radius.tr || 0, radius.br || 0, radius.bl || 0);
+          if (maxRFill > 0) {
+            fillLayer.setAttribute('rx', Math.max(0, Math.min(maxRFill, maxR)).toString());
+          } else {
+            fillLayer.removeAttribute('rx');
+          }
 
           liveElement.setAttribute('data-fill-color', backgroundColor.fill);
         } else {
@@ -822,13 +793,13 @@ const GifEditor = ({
             if (backgroundColor.strokeType === 'gradient' && backgroundColor.strokeStops) {
               liveElement.setAttribute('data-stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
               liveElement.setAttribute('data-stroke-stops', backgroundColor.strokeStops || '');
-              liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
+              liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle || '0');
               liveElement.setAttribute('data-stroke-radius', backgroundColor.strokeRadius || '100');
 
               strokeOverlay.setAttribute('stroke-type', 'gradient');
               strokeOverlay.setAttribute('stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
               strokeOverlay.setAttribute('stroke-stops', backgroundColor.strokeStops || '');
-              strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
+              strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle || '0');
               strokeOverlay.setAttribute('stroke-radius', backgroundColor.strokeRadius || '100');
               syncGradient(liveElement.ownerDocument || document, strokeOverlay, 'stroke');
             } else {
@@ -1006,13 +977,13 @@ const GifEditor = ({
                 tEl = svgImageEl.parentNode;
               }
               let bBox = { x: 0, y: 0, width: 100, height: 100 };
-              try { bBox = tEl.getBBox(); } catch (e) { }
-
+              try { bBox = tEl.getBBox(); } catch (e) {}
+              
               let xStr = tEl.getAttribute('x') || '0';
               let yStr = tEl.getAttribute('y') || '0';
               let wStr = tEl.getAttribute('width') || '100%';
               let hStr = tEl.getAttribute('height') || '100%';
-
+              
               let obx = xStr.includes('%') ? bBox.x : parseFloat(xStr) || 0;
               let oby = yStr.includes('%') ? bBox.y : parseFloat(yStr) || 0;
               let obw = wStr.includes('%') ? bBox.width : parseFloat(wStr) || 100;
@@ -1417,9 +1388,8 @@ function syncGradient(doc, element, baseAttr) {
     gradEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
     gradEl.id = gradId;
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
-      const mathAngle = angle - 90;
-      const angleRad = (mathAngle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
+      const angleRad = (angle * Math.PI) / 180;
       gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
       gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
       gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');

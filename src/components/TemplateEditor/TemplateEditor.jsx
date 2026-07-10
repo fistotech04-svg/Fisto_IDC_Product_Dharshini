@@ -43,13 +43,16 @@ const parseLayersFromSVG = (element) => {
       if (child.tagName.toLowerCase() === 'svg' && child.classList.contains('svg-crop-wrapper')) {
         return parseLayersFromSVG(child);
       }
-
       // Ensure element has a unique ID for selection and state tracking
-      if (!child.id) {
-        child.id = `${child.tagName.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`;
+      let id = child.getAttribute('id') || child.id;
+      if (!id) {
+        id = `${child.tagName.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`;
+        child.setAttribute('id', id);
+        if ('id' in child) {
+          try { child.id = id; } catch(e) {}
+        }
       }
-      const id = child.id;
-      const rawName = child.getAttribute('data-name') || child.id || `${child.tagName.charAt(0).toUpperCase() + child.tagName.slice(1)}`;
+      const rawName = child.getAttribute('data-name') || id || `${child.tagName.charAt(0).toUpperCase() + child.tagName.slice(1)}`;
       const cleanName = rawName.replace(/^tpl-[a-z0-9]{4}-/, '');
 
       const layer = {
@@ -74,20 +77,73 @@ const parseLayersFromSVG = (element) => {
         (child.tagName.toLowerCase() === 'foreignobject' && child.getAttribute('data-type') !== 'video' && child.getAttribute('data-type') !== 'iframe');
 
       if (isGroup || isText) {
-        // Ensure core layer type is determined for proper icon rendering
-        let coreType = 'image';
-        if (child.getAttribute('data-is-video-group') === 'true') {
-          coreType = 'video';
-        } else if (child.getAttribute('data-is-gif-group') === 'true') {
-          coreType = 'image';
+        let activeEffects = [];
+        
+        if (isGroup) {
+          const activeEffectsStr = child.getAttribute('data-active-effects') || '';
+          activeEffects = activeEffectsStr.split(',').filter(Boolean);
         } else if (isText) {
-          coreType = 'text';
+          if (child.getAttribute('data-effect-drop-shadow') === 'true') activeEffects.push('Drop Shadow');
+          if (child.getAttribute('data-effect-inner-shadow') === 'true') activeEffects.push('Inner Shadow');
         }
 
-        // Flatten the structural group so it acts as a single element in the Layer panel
-        delete layer.children;
-        layer.type = coreType;
-        layer.isStructuralGroup = true;
+        const strokeAttr = child.getAttribute('stroke') || child.getAttribute('data-stroke-color');
+        const hasStroke = strokeAttr && strokeAttr !== 'none' && strokeAttr !== 'transparent';
+        const fillAttr = child.getAttribute('fill') || child.getAttribute('data-fill-color');
+        const hasFill = (fillAttr && fillAttr !== 'none' && fillAttr !== 'transparent') || isText; // text almost always has a fill
+
+        const virtualLayers = [];
+
+        // Order for UI rendering (will be reversed in Layer.jsx): Drop Shadow, Fill Color, Image/Video/GIF, Inner Shadow, Stroke
+        if (activeEffects.includes('Drop Shadow')) {
+          virtualLayers.push({ id: `${layer.id}-effect-drop-shadow`, name: 'Drop Shadow', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
+        }
+        if (hasFill) {
+          virtualLayers.push({ id: `${layer.id}-effect-fill`, name: 'Fill Color', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
+        }
+
+        // Ensure core layer is present
+        let coreType = 'image';
+        let coreName = 'Image';
+        if (child.getAttribute('data-is-video-group') === 'true') {
+          coreType = 'video';
+          coreName = 'Video';
+        } else if (child.getAttribute('data-is-gif-group') === 'true') {
+          coreType = 'image';
+          coreName = 'GIF';
+        } else if (isText) {
+          coreType = 'text';
+          coreName = 'Text';
+        }
+
+        const imgChildIdx = layer.children ? layer.children.findIndex(c => c.type === coreType || c.name === coreName || c.name === 'Image' || c.name === 'Text') : -1;
+        let imgLayer = null;
+        if (imgChildIdx !== -1) {
+          imgLayer = layer.children.splice(imgChildIdx, 1)[0];
+        } else {
+          imgLayer = { id: `${layer.id}-core`, name: coreName, type: coreType, visible: layer.visible, locked: true };
+        }
+        imgLayer.parentId = layer.id;
+        imgLayer.isVirtualImageChild = true;
+        virtualLayers.push(imgLayer);
+
+        if (activeEffects.includes('Inner Shadow')) {
+          virtualLayers.push({ id: `${layer.id}-effect-inner-shadow`, name: 'Inner Shadow', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
+        }
+        if (hasStroke) {
+          virtualLayers.push({ id: `${layer.id}-effect-stroke`, name: 'Stroke', type: 'effect', visible: layer.visible, locked: true, parentId: layer.id, isVirtualImageChild: true });
+        }
+
+        // Include any other remaining children
+        if (layer.children && layer.children.length > 0) {
+          layer.children.forEach(c => {
+            c.parentId = layer.id;
+            c.isVirtualImageChild = true;
+            virtualLayers.push(c);
+          });
+        }
+
+        layer.children = virtualLayers;
       }
 
       return [layer];
@@ -122,6 +178,7 @@ const TemplateEditor = () => {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isDoublePage, setIsDoublePage] = useState(false);
+  const [isRulerEnabled, setIsRulerEnabled] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateTargetIndex, setTemplateTargetIndex] = useState(null);
@@ -304,6 +361,8 @@ const TemplateEditor = () => {
   });
 
   const lastSavedHtmlsRef = useRef({});
+  // Ref to prevent the page-selection effect from resetting to root during paste
+  const skipPasteResetRef = useRef(false);
 
   // Sync state to ExportModal context
   useEffect(() => {
@@ -366,14 +425,14 @@ const TemplateEditor = () => {
                 const mimeString = parts[0].split(':')[1].split(';')[0];
                 let byteString;
                 if (parts[0].indexOf('base64') >= 0) {
-                  byteString = atob(parts[1]);
+                    byteString = atob(parts[1]);
                 } else {
-                  byteString = decodeURI(parts[1]);
+                    byteString = decodeURI(parts[1]);
                 }
                 const ab = new ArrayBuffer(byteString.length);
                 const ia = new Uint8Array(ab);
                 for (let i = 0; i < byteString.length; i++) {
-                  ia[i] = byteString.charCodeAt(i);
+                    ia[i] = byteString.charCodeAt(i);
                 }
                 blob = new Blob([ab], { type: mimeString });
               }
@@ -454,23 +513,25 @@ const TemplateEditor = () => {
           while (searchIndex < newHtml.length) {
             const imgIdx = newHtml.indexOf('data:image/', searchIndex);
             const audIdx = newHtml.indexOf('data:audio/', searchIndex);
-
+            const vidIdx = newHtml.indexOf('data:video/', searchIndex);
+            
             let foundIdx = -1;
-            if (imgIdx !== -1 && audIdx !== -1) foundIdx = Math.min(imgIdx, audIdx);
-            else if (imgIdx !== -1) foundIdx = imgIdx;
-            else if (audIdx !== -1) foundIdx = audIdx;
-
+            const indices = [imgIdx, audIdx, vidIdx].filter(idx => idx !== -1);
+            if (indices.length > 0) {
+              foundIdx = Math.min(...indices);
+            }
+            
             if (foundIdx === -1) break;
 
             // The data URI is embedded in a JSON string, so it ends at &quot; or "
             const endIdx1 = newHtml.indexOf('&quot;', foundIdx);
             const endIdx2 = newHtml.indexOf('"', foundIdx);
-
+            
             let endIdx = -1;
             if (endIdx1 !== -1 && endIdx2 !== -1) endIdx = Math.min(endIdx1, endIdx2);
             else if (endIdx1 !== -1) endIdx = endIdx1;
             else if (endIdx2 !== -1) endIdx = endIdx2;
-
+            
             if (endIdx !== -1) {
               const dataUri = newHtml.substring(foundIdx, endIdx);
               if (dataUri.includes(';base64,')) {
@@ -488,24 +549,25 @@ const TemplateEditor = () => {
               // To handle 3MB+ data URIs, we manually convert base64 to Blob.
               const parts = actualDataUri.split(',');
               const mimeString = parts[0].split(':')[1].split(';')[0];
-
+              
               // Handle URL encoded data URIs (e.g. svg+xml) or pure base64
               let byteString;
               if (parts[0].indexOf('base64') >= 0) {
-                byteString = atob(parts[1]);
+                  byteString = atob(parts[1]);
               } else {
-                byteString = decodeURI(parts[1]);
+                  byteString = decodeURI(parts[1]);
               }
-
+              
               const ab = new ArrayBuffer(byteString.length);
               const ia = new Uint8Array(ab);
               for (let i = 0; i < byteString.length; i++) {
-                ia[i] = byteString.charCodeAt(i);
+                  ia[i] = byteString.charCodeAt(i);
               }
               const blob = new Blob([ab], { type: mimeString });
 
               const isAudio = blob.type.startsWith('audio/');
-              const assetType = isAudio ? 'audio' : 'image';
+              const isVideo = blob.type.startsWith('video/');
+              const assetType = isAudio ? 'audio' : (isVideo ? 'video' : 'image');
 
               const formData = new FormData();
               formData.append('emailId', user?.emailId);
@@ -795,7 +857,7 @@ const TemplateEditor = () => {
       }
     }, 500); // Give save a moment to complete
   }, [currentBook]);
-
+  
   useEffect(() => {
     if (setPreviewHandler) {
       setPreviewHandler(() => stablePreviewHandler);
@@ -1204,8 +1266,9 @@ const TemplateEditor = () => {
           setCurrentFrameId(activeRoot);
         } else {
           // Selection became empty — restore roots (Only if not using a tool)
+          // Skip reset if a paste operation just happened (skipPasteResetRef guard)
           const currentIds = multiSelectedIds || new Set();
-          if (currentIds.size === 0 && activeMainTool === 'select') {
+          if (!skipPasteResetRef.current && currentIds.size === 0 && activeMainTool === 'select') {
             setMultiSelectedIds(new Set([root1, root2]));
             setSelectedLayerId(activeRoot);
             setCurrentFrameId(activeRoot);
@@ -1219,8 +1282,9 @@ const TemplateEditor = () => {
         const rootId = page.layers[0].id;
 
         // Auto-select root ONLY if we just landed here OR selection became empty (Only if not using a tool)
+        // Skip reset if a paste operation just happened (skipPasteResetRef guard)
         const currentIds = multiSelectedIds || new Set();
-        if (hasSwitchedPage || (currentIds.size === 0 && activeMainTool === 'select')) {
+        if (!skipPasteResetRef.current && (hasSwitchedPage || (currentIds.size === 0 && activeMainTool === 'select'))) {
           setMultiSelectedIds(new Set([rootId]));
           setSelectedLayerId(rootId);
           setCurrentFrameId(rootId);
@@ -1238,8 +1302,11 @@ const TemplateEditor = () => {
   }, [isDoublePage]);
 
 
-  const saveToHistory = () => {
-    setHistory(prev => [...prev.slice(-(MAX_HISTORY - 1)), pages]);
+  const saveToHistory = (currentState = pages) => {
+    setHistory(prev => {
+      if (prev.length > 0 && prev[prev.length - 1] === currentState) return prev;
+      return [...prev.slice(-(MAX_HISTORY - 1)), currentState];
+    });
     setRedoStack([]); // Clear redo on new action
   };
 
@@ -1260,15 +1327,14 @@ const TemplateEditor = () => {
   };
 
   const updatePageHtml = (pageIndex, html) => {
-    saveToHistory();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'image/svg+xml');
-    const svgEl = doc.querySelector('svg');
-
-    const newLayers = svgEl ? parseLayersFromSVG(svgEl) : [];
-
     setPages(prev => {
+      saveToHistory(prev);
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'image/svg+xml');
+      const svgEl = doc.querySelector('svg');
+      const newLayers = svgEl ? parseLayersFromSVG(svgEl) : [];
+
       const updated = [...prev];
       const page = updated[pageIndex];
       if (!page) return prev;
@@ -2129,25 +2195,17 @@ const TemplateEditor = () => {
     if (!gradEl) {
       gradEl = doc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
       gradEl.id = gradId;
+      if (svgGradType === 'linear') {
+        gradEl.setAttribute('x1', '0%');
+        gradEl.setAttribute('y1', '0%');
+        gradEl.setAttribute('x2', '100%');
+        gradEl.setAttribute('y2', '0%');
+      } else {
+        gradEl.setAttribute('cx', '50%');
+        gradEl.setAttribute('cy', '50%');
+        gradEl.setAttribute('r', '50%');
+      }
       defs.appendChild(gradEl);
-    }
-
-    // Always update gradient coordinates/radius (whether newly created or existing)
-    if (svgGradType === 'linear') {
-      const angleAttr = element.getAttribute(`${baseAttr}-angle`) || element.getAttribute(`data-${baseAttr}-angle`);
-      const angle = parseFloat(angleAttr !== null ? angleAttr : '180');
-      const mathAngle = angle - 90;
-      const angleRad = (mathAngle * Math.PI) / 180;
-      gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
-      gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
-      gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
-      gradEl.setAttribute('y2', Math.round(50 + Math.sin(angleRad) * 50) + '%');
-    } else {
-      const radiusAttr = element.getAttribute(`${baseAttr}-radius`) || element.getAttribute(`data-${baseAttr}-radius`);
-      const radius = parseFloat(radiusAttr !== null ? radiusAttr : '50');
-      gradEl.setAttribute('cx', '50%');
-      gradEl.setAttribute('cy', '50%');
-      gradEl.setAttribute('r', radius + '%');
     }
 
     // Update stops
@@ -2403,7 +2461,6 @@ const TemplateEditor = () => {
         }
         return doc;
       };
-
       setPages(prev => {
         const updated = [...prev];
         const page = updated[pageIndex];
@@ -2433,7 +2490,6 @@ const TemplateEditor = () => {
       if (!safeStr.includes('xmlns:xlink=')) safeStr = safeStr.replace('<svg ', '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ');
       let doc = parser.parseFromString(safeStr, 'image/svg+xml');
       if (doc.querySelector('parsererror')) doc = parser.parseFromString(safeStr, 'text/html');
-
       let element = doc.getElementById(elementId);
       if (!element) {
         element = doc.querySelector(`[data-name="${elementId}"]`);
@@ -2443,113 +2499,129 @@ const TemplateEditor = () => {
           ? Object.entries(attribute)
           : [[attribute, value]];
 
+        // ── Pass 1: Write all attribute values onto the element first ──────────
+        // This is critical for batch corner-radius updates: we must ensure every
+        // data-tl/tr/bl/br and rx value is committed before any shape redraw
+        // reads them, otherwise redraws triggered mid-loop see stale values.
         updates.forEach(([attr, val]) => {
           if (val === null || val === 'none' || val === '#') {
-            // For Fill/Stroke, we explicitly set 'none' to avoid SVG default black
             if (attr === 'fill' || attr === 'stroke') {
               element.setAttribute(attr, 'none');
             } else {
               element.removeAttribute(attr);
             }
-
             if (attr === 'stroke-width') element.setAttribute('stroke', 'none');
           } else {
             element.setAttribute(attr, val);
             if (attr === 'stroke-width' && val !== '0' && (element.getAttribute('stroke') === 'none' || !element.getAttribute('stroke'))) {
-              // If we're setting a stroke width, make sure there's a color
               element.setAttribute('stroke', '#000000');
             }
+          }
+        });
 
-            // --- DYNAMIC SHAPE REDRAW (FOR POLYGON/STAR/ROUNDED RECT) ---
-            const isRectCorner = ['data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr);
-            if (attr === 'data-count' || attr === 'data-rx' || attr === 'data-ry' || attr === 'data-ratio' || attr === 'data-radius' || isRectCorner) {
-              const shapeType = element.getAttribute('data-shape-type') || (element.tagName === 'rect' ? 'rectangle' : null);
+        // ── Pass 2: Shape redraws — all attrs are now committed ───────────────
+        // Track whether a rect has already been redrawn in this batch so we
+        // don't emit multiple redundant path rewrites for the same element.
+        let rectRedrawnThisBatch = false;
 
-              if (shapeType === 'polygon' || shapeType === 'star') {
-                const cx = parseFloat(element.getAttribute('data-cx') || 0);
-                const cy = parseFloat(element.getAttribute('data-cy') || 0);
-                const rx = parseFloat(element.getAttribute('data-rx') || 0);
-                const count = parseInt(attr === 'data-count' ? val : (element.getAttribute('data-count') || 3));
-                const cr = parseFloat(attr === 'data-radius' ? val : (element.getAttribute('data-radius') || 0));
+        updates.forEach(([attr, val]) => {
+          if (val === null || val === 'none' || val === '#') return; // no redraw needed
 
-                const pts = [];
-                if (shapeType === 'polygon') {
-                  for (let i = 0; i < count; i++) {
-                    const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
-                    pts.push({ x: cx + rx * Math.cos(angle), y: cy + rx * Math.sin(angle) });
-                  }
-                } else if (shapeType === 'star') {
-                  const ratio = parseFloat(attr === 'data-ratio' ? val : (element.getAttribute('data-ratio') || 40)) / 100;
-                  const ri = rx * ratio;
-                  const sides = count * 2;
-                  for (let i = 0; i < sides; i++) {
-                    const r = (i % 2 === 0) ? rx : ri;
-                    const angle = (Math.PI / count) * i - Math.PI / 2;
-                    pts.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
-                  }
+          // --- DYNAMIC SHAPE REDRAW (FOR POLYGON/STAR/ROUNDED RECT) ---
+          const isRectCorner = ['data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr);
+          if (attr === 'data-count' || attr === 'data-rx' || attr === 'data-ry' || attr === 'data-ratio' || attr === 'data-radius' || isRectCorner || attr === 'rx') {
+            const shapeType = element.getAttribute('data-shape-type') || (element.tagName === 'rect' ? 'rectangle' : null);
+
+            if (shapeType === 'polygon' || shapeType === 'star') {
+              const cx = parseFloat(element.getAttribute('data-cx') || 0);
+              const cy = parseFloat(element.getAttribute('data-cy') || 0);
+              const rx = parseFloat(element.getAttribute('data-rx') || 0);
+              const count = parseInt(element.getAttribute('data-count') || 3);
+              const cr = parseFloat(element.getAttribute('data-radius') || 0);
+
+              const pts = [];
+              if (shapeType === 'polygon') {
+                for (let i = 0; i < count; i++) {
+                  const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
+                  pts.push({ x: cx + rx * Math.cos(angle), y: cy + rx * Math.sin(angle) });
                 }
-
-                if (cr > 0 && pts.length > 2) {
-                  let pathData = "";
-                  const cornerPoints = pts.map((curr, i) => {
-                    const prev = pts[(i + pts.length - 1) % pts.length];
-                    const next = pts[(i + 1) % pts.length];
-                    const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
-                    const d2 = { x: next.x - curr.x, y: next.y - curr.y };
-                    const l1 = Math.sqrt(d1.x * d1.x + d1.y * d1.y);
-                    const l2 = Math.sqrt(d2.x * d2.x + d2.y * d2.y);
-                    const limit = Math.min(cr, l1 / 2, l2 / 2);
-                    return {
-                      q: { x: curr.x, y: curr.y },
-                      p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
-                      p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
-                    };
-                  });
-                  cornerPoints.forEach((cp, i) => {
-                    if (i === 0) pathData += `M ${cp.p1.x} ${cp.p1.y}`;
-                    else pathData += ` L ${cp.p1.x} ${cp.p1.y}`;
-                    pathData += ` Q ${cp.q.x} ${cp.q.y}, ${cp.p2.x} ${cp.p2.y}`;
-                  });
-                  pathData += " Z";
-                  element.setAttribute('d', pathData);
-                } else {
-                  element.setAttribute('d', `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} Z`);
+              } else if (shapeType === 'star') {
+                const ratio = parseFloat(element.getAttribute('data-ratio') || 40) / 100;
+                const ri = rx * ratio;
+                const sides = count * 2;
+                for (let i = 0; i < sides; i++) {
+                  const r = (i % 2 === 0) ? rx : ri;
+                  const angle = (Math.PI / count) * i - Math.PI / 2;
+                  pts.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
                 }
               }
-              else if (shapeType === 'rectangle' && (isRectCorner || attr === 'rx')) {
-                const x = parseFloat(element.getAttribute('x') || 0);
-                const y = parseFloat(element.getAttribute('y') || 0);
-                const w = parseFloat(element.getAttribute('width') || 0);
-                const h = parseFloat(element.getAttribute('height') || 0);
-                const defR = parseFloat(element.getAttribute('rx') || 0);
 
-                const tl = parseFloat(element.getAttribute('data-tl') || defR);
-                const tr = parseFloat(element.getAttribute('data-tr') || defR);
-                const bl = parseFloat(element.getAttribute('data-bl') || defR);
-                const br = parseFloat(element.getAttribute('data-br') || defR);
+              if (cr > 0 && pts.length > 2) {
+                let pathData = "";
+                const cornerPoints = pts.map((curr, i) => {
+                  const prev = pts[(i + pts.length - 1) % pts.length];
+                  const next = pts[(i + 1) % pts.length];
+                  const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+                  const d2 = { x: next.x - curr.x, y: next.y - curr.y };
+                  const l1 = Math.sqrt(d1.x * d1.x + d1.y * d1.y);
+                  const l2 = Math.sqrt(d2.x * d2.x + d2.y * d2.y);
+                  const limit = Math.min(cr, l1 / 2, l2 / 2);
+                  return {
+                    q: { x: curr.x, y: curr.y },
+                    p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+                    p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+                  };
+                });
+                cornerPoints.forEach((cp, i) => {
+                  if (i === 0) pathData += `M ${cp.p1.x} ${cp.p1.y}`;
+                  else pathData += ` L ${cp.p1.x} ${cp.p1.y}`;
+                  pathData += ` Q ${cp.q.x} ${cp.q.y}, ${cp.p2.x} ${cp.p2.y}`;
+                });
+                pathData += " Z";
+                element.setAttribute('d', pathData);
+              } else {
+                element.setAttribute('d', `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} Z`);
+              }
+            }
+            else if (shapeType === 'rectangle' && (isRectCorner || attr === 'rx') && !rectRedrawnThisBatch) {
+              // All corner attrs are already written in Pass 1 — read them fresh.
+              rectRedrawnThisBatch = true;
+              const x = parseFloat(element.getAttribute('x') || 0);
+              const y = parseFloat(element.getAttribute('y') || 0);
+              const w = parseFloat(element.getAttribute('width') || 0);
+              const h = parseFloat(element.getAttribute('height') || 0);
+              const defR = parseFloat(element.getAttribute('rx') || 0);
 
-                const d = `
-                      M ${x + tl},${y}
-                      L ${x + w - tr},${y}
-                      Q ${x + w},${y} ${x + w},${y + tr}
-                      L ${x + w},${y + h - br}
-                      Q ${x + w},${y + h} ${x + w - br},${y + h}
-                      L ${x + bl},${y + h}
-                      Q ${x},${y + h} ${x},${y + h - bl}
-                      L ${x},${y + tl}
-                      Q ${x},${y} ${x + tl},${y}
-                      Z
-                   `.replace(/\s+/g, ' ').trim();
+              // Clamp each corner radius to at most half the rect's shorter dimension.
+              // Without clamping, radii > w/2 or h/2 cause bezier arcs to cross,
+              // producing the unwanted eye/lens shape (matching CSS border-radius behaviour).
+              const maxR = Math.min(w / 2, h / 2);
+              const tl = Math.min(parseFloat(element.getAttribute('data-tl') || defR), maxR);
+              const tr = Math.min(parseFloat(element.getAttribute('data-tr') || defR), maxR);
+              const bl = Math.min(parseFloat(element.getAttribute('data-bl') || defR), maxR);
+              const br = Math.min(parseFloat(element.getAttribute('data-br') || defR), maxR);
 
-                if (element.tagName === 'rect') {
-                  const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
-                  Array.from(element.attributes).forEach(a => path.setAttribute(a.name, a.value));
-                  path.setAttribute('d', d);
-                  path.setAttribute('data-shape-type', 'rectangle');
-                  element.parentNode.replaceChild(path, element);
-                } else {
-                  element.setAttribute('d', d);
-                }
+              const d = `
+                    M ${x + tl},${y}
+                    L ${x + w - tr},${y}
+                    A ${tr},${tr} 0 0 1 ${x + w},${y + tr}
+                    L ${x + w},${y + h - br}
+                    A ${br},${br} 0 0 1 ${x + w - br},${y + h}
+                    L ${x + bl},${y + h}
+                    A ${bl},${bl} 0 0 1 ${x},${y + h - bl}
+                    L ${x},${y + tl}
+                    A ${tl},${tl} 0 0 1 ${x + tl},${y}
+                    Z
+                 `.replace(/\s+/g, ' ').trim();
+
+              if (element.tagName === 'rect') {
+                const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+                Array.from(element.attributes).forEach(a => path.setAttribute(a.name, a.value));
+                path.setAttribute('d', d);
+                path.setAttribute('data-shape-type', 'rectangle');
+                element.parentNode.replaceChild(path, element);
+              } else {
+                element.setAttribute('d', d);
               }
             }
           }
@@ -2922,10 +2994,26 @@ const TemplateEditor = () => {
       return updated;
     });
 
-    // Select all newly pasted elements
+    // Select all newly pasted elements.
+    // Set guard first so the page-selection useEffect (which reacts to pages changing)
+    // doesn't reset selection back to the root frame during this paste operation.
     const newIds = new Set(newItems.map(item => item.newLayer.id));
+    const lastNewId = newItems.length > 0 ? newItems[newItems.length - 1].newLayer.id : null;
+
+    skipPasteResetRef.current = true;
+    
+    // We can set multiSelectedIds immediately for visual handles
     setMultiSelectedIds(newIds);
-    if (newItems.length > 0) setSelectedLayerId(newItems[newItems.length - 1].newLayer.id);
+    
+    // Defer setSelectedLayerId so that when RightSidebar renders the properties panel (e.g. TextEditor),
+    // the LIVE DOM has already been updated with the new HTML. Otherwise, document.getElementById
+    // during render will return null and the property editors will crash/return null.
+    setTimeout(() => {
+      if (lastNewId) setSelectedLayerId(lastNewId);
+      
+      // Clear the guard after the selection has been safely applied
+      setTimeout(() => { skipPasteResetRef.current = false; }, 50);
+    }, 50);
   };
 
   // ── KEYBOARD SHORTCUTS (Cut, Copy, Paste) ──────────────────────────────────
@@ -3303,10 +3391,10 @@ const TemplateEditor = () => {
             child.getAttribute('data-name') !== 'Overlay'
           )
           .map((child) => {
-            const id = child.id || `${child.tagName.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`;
-            if (!child.id) child.setAttribute('id', id);
+            const id = child.getAttribute('id') || child.id || `${child.tagName.toLowerCase()}-${Math.random().toString(36).substr(2, 5)}`;
+            if (!child.getAttribute('id') && !child.id) child.setAttribute('id', id);
 
-            const rawName = child.getAttribute('data-name') || child.id || `${child.tagName.charAt(0).toUpperCase() + child.tagName.slice(1)}`;
+            const rawName = child.getAttribute('data-name') || id || `${child.tagName.charAt(0).toUpperCase() + child.tagName.slice(1)}`;
             // Strip the unique template prefix for cleaner display (e.g. tpl-a1b2-MyLayer -> MyLayer)
             const cleanName = rawName.replace(/^tpl-[a-z0-9]{4}-/, '');
 
@@ -3632,6 +3720,7 @@ const TemplateEditor = () => {
         <MainEditor
           isPdfProject={isPdfProject}
           isDoublePage={isDoublePage}
+          isRulerEnabled={isRulerEnabled}
           pages={pages}
           activePageIndex={activePageIndex}
           setActivePageIndex={setActivePageIndex}
@@ -3702,6 +3791,8 @@ const TemplateEditor = () => {
       <RightSidebar
         isDoublePage={isDoublePage}
         setIsDoublePage={setIsDoublePage}
+        isRulerEnabled={isRulerEnabled}
+        setIsRulerEnabled={setIsRulerEnabled}
         activeMainTool={activeMainTool}
         setActiveMainTool={setActiveMainTool}
         activeTopTool={activeTopTool}

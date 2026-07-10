@@ -16,9 +16,10 @@ const DIRECT_CURSOR = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.or
 
 export const getVisualBBox = (el) => {
   if (!el || typeof el.getBBox !== 'function') return { x: 0, y: 0, width: 0, height: 0 };
+  
 
   const cropStr = el.getAttribute('data-crop-data');
-  if (cropStr && cropStr !== 'null' && !el.hasAttribute('data-slideshow-cropped')) {
+  if (cropStr && cropStr !== 'null') {
     const bbox = el.getBBox();
     try {
       const crop = JSON.parse(cropStr);
@@ -30,12 +31,11 @@ export const getVisualBBox = (el) => {
       };
     } catch (e) { }
   }
-
   if (el.tagName.toLowerCase() === 'g' && el.querySelector('[data-crop-data]')) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const children = Array.from(el.children);
     let hasValidChild = false;
-
+    
     for (const child of children) {
       if (typeof child.getBBox === 'function' && child.style.display !== 'none' && child.style.visibility !== 'hidden' && child.tagName.toLowerCase() !== 'defs') {
         const childBBox = getVisualBBox(child);
@@ -46,13 +46,13 @@ export const getVisualBBox = (el) => {
           if (parentCTM && childCTM) {
             childMatrix = parentCTM.inverse().multiply(childCTM);
           }
-        } catch (e) { }
-
+        } catch (e) {}
+        
         const pt1 = new DOMPoint(childBBox.x, childBBox.y).matrixTransform(childMatrix);
         const pt2 = new DOMPoint(childBBox.x + childBBox.width, childBBox.y).matrixTransform(childMatrix);
         const pt3 = new DOMPoint(childBBox.x + childBBox.width, childBBox.y + childBBox.height).matrixTransform(childMatrix);
         const pt4 = new DOMPoint(childBBox.x, childBBox.y + childBBox.height).matrixTransform(childMatrix);
-
+        
         const pts = [pt1, pt2, pt3, pt4];
         for (const pt of pts) {
           if (pt.x < minX) minX = pt.x;
@@ -63,7 +63,7 @@ export const getVisualBBox = (el) => {
         hasValidChild = true;
       }
     }
-
+    
     if (hasValidChild) {
       return {
         x: minX,
@@ -75,61 +75,6 @@ export const getVisualBBox = (el) => {
   }
 
   return el.getBBox();
-};
-
-export const applySlideshowCrop = (el, imgEl, nextIndex) => {
-  if (imgEl.tagName?.toLowerCase() !== 'image' || !el.hasAttribute('data-crop-data')) return;
-  try {
-    if (nextIndex === 0) {
-      el.removeAttribute('data-slideshow-cropped');
-      const origClip = el.getAttribute('data-orig-clip-path');
-      if (origClip) {
-        imgEl.style.setProperty('clip-path', origClip, 'important');
-        imgEl.style.setProperty('-webkit-clip-path', origClip, 'important');
-      }
-      const origW = el.getAttribute('data-crop-orig-w');
-      if (origW) {
-        imgEl.setAttribute('width', origW);
-        imgEl.setAttribute('height', el.getAttribute('data-crop-orig-h'));
-        imgEl.setAttribute('x', el.getAttribute('data-crop-orig-x') || 0);
-        imgEl.setAttribute('y', el.getAttribute('data-crop-orig-y') || 0);
-      }
-    } else {
-      el.setAttribute('data-slideshow-cropped', 'true');
-      if (!el.hasAttribute('data-orig-clip-path')) {
-        el.setAttribute('data-orig-clip-path', imgEl.style.clipPath);
-      }
-      imgEl.style.removeProperty('clip-path');
-      imgEl.style.removeProperty('-webkit-clip-path');
-      
-      let origWStr = el.getAttribute('data-crop-orig-w');
-      if (!origWStr) {
-        origWStr = imgEl.getAttribute('width');
-        if (!origWStr) return;
-        el.setAttribute('data-crop-orig-w', origWStr);
-        el.setAttribute('data-crop-orig-h', imgEl.getAttribute('height'));
-        el.setAttribute('data-crop-orig-x', imgEl.getAttribute('x') || 0);
-        el.setAttribute('data-crop-orig-y', imgEl.getAttribute('y') || 0);
-      }
-      
-      const origW = parseFloat(origWStr);
-      const origH = parseFloat(el.getAttribute('data-crop-orig-h'));
-      const origX = parseFloat(el.getAttribute('data-crop-orig-x') || 0);
-      const origY = parseFloat(el.getAttribute('data-crop-orig-y') || 0);
-      
-      const crop = JSON.parse(el.getAttribute('data-crop-data'));
-      
-      const newX = origX + (parseFloat(crop.left) / 100) * origW;
-      const newY = origY + (parseFloat(crop.top) / 100) * origH;
-      const newW = origW * (parseFloat(crop.width) / 100);
-      const newH = origH * (parseFloat(crop.height) / 100);
-      
-      imgEl.setAttribute('width', newW);
-      imgEl.setAttribute('height', newH);
-      imgEl.setAttribute('x', newX);
-      imgEl.setAttribute('y', newY);
-    }
-  } catch(e) {}
 };
 
 // Global style to ensure injected SVGs always fill their container perfectly
@@ -316,6 +261,8 @@ const svgGlobalStyles = `
     display: none !important;
   }
 `;
+import CanvasRuler from './CanvasRuler';
+import GuidesOverlay from './GuidesOverlay';
 import TopToolbar from './TopToolbar';
 
 const SelectionTooltip = ({ selectedId, multiSelectedIds, zoom, setActiveTopTool, pageIndex, activePageIndex, updateElementAttribute, activeTopTool }) => {
@@ -654,6 +601,7 @@ const CurveIcon = ({ width, height, className }) => (
 const MainEditor = ({
   isPdfProject,
   isDoublePage,
+  isRulerEnabled = true,
   pages = [],
   activePageIndex,
   setActivePageIndex,
@@ -939,7 +887,7 @@ const MainEditor = ({
         }
 
         const containerRect = pageContainer.getBoundingClientRect();
-
+        
         let elRect;
         try {
           const bbox = getVisualBBox(el);
@@ -1174,7 +1122,6 @@ const MainEditor = ({
         if (imgTag2 === 'image') {
           imgEl.setAttribute('href', url);
           try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
-          applySlideshowCrop(el, imgEl, nextIndex);
         } else if (imgTag2 === 'img') {
           imgEl.src = url;
         } else {
@@ -1285,7 +1232,6 @@ const MainEditor = ({
               if (imgTag === 'image') {
                 imgEl.setAttribute('href', url);
                 try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
-                applySlideshowCrop(el, imgEl, nextIndex);
               } else if (imgTag === 'img') {
                 imgEl.src = url;
               } else {
@@ -1380,7 +1326,6 @@ const MainEditor = ({
         if (imgTag === 'image') {
           imgEl.setAttribute('href', url);
           try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
-          applySlideshowCrop(slideshowEl, imgEl, nextIndex);
         } else if (imgTag === 'img') {
           imgEl.src = url;
         } else {
@@ -1577,12 +1522,12 @@ const MainEditor = ({
 
           const VOL_ON_SVG = `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
           const VOL_OFF_SVG = `<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
-
+          
           const updateVolumeIcon = () => {
             volumeBtn.innerHTML = (video.muted || video.volume === 0) ? VOL_OFF_SVG : VOL_ON_SVG;
           };
           updateVolumeIcon();
-
+          
           volumeBtn.onclick = (e) => {
             e.stopPropagation();
             video.muted = !video.muted;
@@ -1628,11 +1573,11 @@ const MainEditor = ({
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'auto'
           });
-
+          
           const onPlay = () => { playBtn.innerHTML = PAUSE_SVG; };
           const onPause = () => { playBtn.innerHTML = PLAY_SVG; };
           playBtn.innerHTML = video.paused ? PLAY_SVG : PAUSE_SVG;
-
+          
           video.addEventListener('play', onPlay);
           video.addEventListener('pause', onPause);
           video.addEventListener('volumechange', updateVolumeIcon);
@@ -1674,7 +1619,7 @@ const MainEditor = ({
             opacity: '0.9',
             marginBottom: '1em',
           });
-
+          
           const formatTime = (sec) => {
             if (isNaN(sec)) return "00:00";
             const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -1729,7 +1674,7 @@ const MainEditor = ({
             const rect = progContainer.getBoundingClientRect();
             const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             if (video.duration) video.currentTime = pct * video.duration;
-
+            
             const onMove = (me) => {
               const p = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
               if (video.duration) video.currentTime = p * video.duration;
@@ -1740,7 +1685,7 @@ const MainEditor = ({
             };
             document.addEventListener('pointermove', onMove);
             document.addEventListener('pointerup', onUp);
-
+            
             if (setSelectedLayerId) setSelectedLayerId(layerId);
           };
 
@@ -1750,7 +1695,7 @@ const MainEditor = ({
           bar.appendChild(topContainer);
           bar.appendChild(centerContainer);
           bar.appendChild(bottomContainer);
-
+          
           mountPoint.appendChild(bar);
 
           bar._cleanup = () => {
@@ -1887,9 +1832,9 @@ const MainEditor = ({
 
       // 2. Append to root frame or page container and center it
       const topFrames = getTopLevelFrames(svg);
-      let rootFrame = topFrames.find(f =>
-        !f.getAttribute('data-is-image-group') &&
-        !f.getAttribute('data-is-gif-group') &&
+      let rootFrame = topFrames.find(f => 
+        !f.getAttribute('data-is-image-group') && 
+        !f.getAttribute('data-is-gif-group') && 
         !f.getAttribute('data-is-video-group') &&
         f.getAttribute('data-name') !== 'Overlay'
       ) || svg;
@@ -2013,14 +1958,107 @@ const MainEditor = ({
     return 'ew-resize';
   };
 
+  const drawMultiSelectionHighlight = (ids, type) => {
+    const elementsByOverlay = new Map();
+
+    ids.forEach(id => {
+      document.querySelectorAll(`[id="${id}"]`).forEach(el => {
+        if (el.style.visibility === 'hidden' || el.style.opacity === '0') return;
+        const overlay = getOverlayForElement(el);
+        if (!overlay) return;
+        if (!elementsByOverlay.has(overlay)) elementsByOverlay.set(overlay, []);
+        elementsByOverlay.get(overlay).push(el);
+      });
+    });
+
+    elementsByOverlay.forEach((elements, overlay) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let hasValidBox = false;
+
+      elements.forEach(el => {
+        try {
+          let bbox = getVisualBBox(el);
+          const ctm = el.getScreenCTM();
+          const overlayCtm = overlay.getScreenCTM();
+          if (!ctm || !overlayCtm) return;
+
+          const isFrame = el.getAttribute('data-type') === 'frame';
+          if (isFrame || ((bbox.width < 5 || bbox.height < 5) && el.tagName.toLowerCase() !== 'line')) {
+            const clientRect = el.getBoundingClientRect();
+            const scale = Math.sqrt(ctm.a * ctm.a + ctm.b * ctm.b) || 1;
+            if (isFrame || clientRect.width / scale > 10 || clientRect.height / scale > 10 || el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'foreignobject') {
+              if (clientRect.width > 0 && clientRect.height > 0) {
+                const elInverse = ctm.inverse();
+                const pt = overlay.createSVGPoint();
+                pt.x = clientRect.left; pt.y = clientRect.top;
+                const localTL = pt.matrixTransform(elInverse);
+                pt.x = clientRect.right; pt.y = clientRect.bottom;
+                const localBR = pt.matrixTransform(elInverse);
+                bbox = {
+                  x: Math.min(localTL.x, localBR.x),
+                  y: Math.min(localTL.y, localBR.y),
+                  width: Math.abs(localBR.x - localTL.x),
+                  height: Math.abs(localBR.y - localTL.y)
+                };
+              }
+            }
+          }
+
+          if (bbox.width === 0 && bbox.height === 0) return;
+
+          const svgMatrix = overlayCtm.inverse().multiply(ctm);
+          
+          const pt1 = overlay.createSVGPoint(); pt1.x = bbox.x; pt1.y = bbox.y;
+          const pt2 = overlay.createSVGPoint(); pt2.x = bbox.x + bbox.width; pt2.y = bbox.y;
+          const pt3 = overlay.createSVGPoint(); pt3.x = bbox.x + bbox.width; pt3.y = bbox.y + bbox.height;
+          const pt4 = overlay.createSVGPoint(); pt4.x = bbox.x; pt4.y = bbox.y + bbox.height;
+          
+          const pts = [pt1, pt2, pt3, pt4];
+
+          pts.forEach(p => {
+            const mapped = p.matrixTransform(svgMatrix);
+            if (mapped.x < minX) minX = mapped.x;
+            if (mapped.x > maxX) maxX = mapped.x;
+            if (mapped.y < minY) minY = mapped.y;
+            if (mapped.y > maxY) maxY = mapped.y;
+          });
+          hasValidBox = true;
+        } catch (e) {
+          console.error(e);
+        }
+      });
+
+      if (!hasValidBox) return;
+
+      const dummyId = 'multi-selection-bounds';
+      let dummy = overlay.querySelector(`[id="${dummyId}"]`);
+      if (!dummy) {
+        dummy = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        dummy.id = dummyId;
+        dummy.setAttribute('fill', 'none');
+        dummy.setAttribute('pointer-events', 'none');
+        overlay.appendChild(dummy);
+      }
+      
+      const ctm = overlay.getScreenCTM();
+      if (!ctm) return;
+      
+      const pt1 = overlay.createSVGPoint(); pt1.x = minX; pt1.y = minY;
+      const pt2 = overlay.createSVGPoint(); pt2.x = maxX; pt2.y = maxY;
+      
+      // minX and minY are already in overlay coordinates!
+      // So we don't need to transform them again.
+      dummy.setAttribute('x', minX);
+      dummy.setAttribute('y', minY);
+      dummy.setAttribute('width', maxX - minX);
+      dummy.setAttribute('height', maxY - minY);
+
+      drawOverlayHighlight(dummy, type);
+    });
+  };
+
   const drawOverlayHighlight = (el, type) => {
     if (!el || typeof el.getBBox !== 'function' || typeof el.getScreenCTM !== 'function') return;
-
-    // PREVENT inner children of structural groups from getting highlights (avoids inner dashed lines)
-    const parentGroup = el.closest('g[data-is-image-group="true"], g[data-is-video-group="true"], g[data-is-gif-group="true"]');
-    if (parentGroup && parentGroup !== el) {
-      return;
-    }
 
     const overlay = getOverlayForElement(el);
     if (!overlay) return;
@@ -2162,16 +2200,13 @@ const MainEditor = ({
         polygon.removeAttribute('stroke-dasharray');
       } else if (type === 'entered') {
         polygon.setAttribute('stroke-width', String(1 / zoomScale));
-        if (el.getAttribute('data-is-image-group') === 'true' || el.getAttribute('data-is-video-group') === 'true' || el.getAttribute('data-is-gif-group') === 'true') {
-          polygon.removeAttribute('stroke-dasharray');
-        } else {
-          polygon.setAttribute('stroke-dasharray', `${4 / zoomScale},${4 / zoomScale}`);
-        }
+        polygon.setAttribute('stroke-dasharray', `${4 / zoomScale},${4 / zoomScale}`);
       }
 
       // ── RESIZE HANDLES (8 handles) ──
-      // Only show handles if exactly ONE element is selected, and it's not currently being text-edited
-      const selectionCount = multiSelectedIdsRef.current.size > 0 ? multiSelectedIdsRef.current.size : (selectedLayerIdRef.current ? 1 : 0);
+      // Only show handles if exactly ONE element is selected, or if this is the multi-selection bounding box itself
+      const isMultiSelectionBox = el.id === 'multi' || el.id === 'multi-selection-bounds';
+      const selectionCount = isMultiSelectionBox ? 1 : (multiSelectedIdsRef.current.size > 0 ? multiSelectedIdsRef.current.size : (selectedLayerIdRef.current ? 1 : 0));
       if (selectionCount === 1 && (type === 'selected' || type === 'child-selected') && !isBeingEdited) {
         const htmlOverlay = getHtmlOverlayForElement(el);
         const isFreeFrame = el.getAttribute('data-name') === 'Free Frame';
@@ -2189,120 +2224,120 @@ const MainEditor = ({
           const handleSize = useLBrackets ? 12 : 9; // Slightly larger for interaction mode corners
           const handleNames = useLBrackets ? ['nw', 'ne', 'se', 'sw'] : ['nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w'];
 
-          // Define all points in world space
-          const worldPts = [...mapped]; // Corners
-          const midN = { x: (mapped[0].x + mapped[1].x) / 2, y: (mapped[0].y + mapped[1].y) / 2 };
-          const midE = { x: (mapped[1].x + mapped[2].x) / 2, y: (mapped[1].y + mapped[2].y) / 2 };
-          const midS = { x: (mapped[2].x + mapped[3].x) / 2, y: (mapped[2].y + mapped[3].y) / 2 };
-          const midW = { x: (mapped[3].x + mapped[0].x) / 2, y: (mapped[3].y + mapped[0].y) / 2 };
+        // Define all points in world space
+        const worldPts = [...mapped]; // Corners
+        const midN = { x: (mapped[0].x + mapped[1].x) / 2, y: (mapped[0].y + mapped[1].y) / 2 };
+        const midE = { x: (mapped[1].x + mapped[2].x) / 2, y: (mapped[1].y + mapped[2].y) / 2 };
+        const midS = { x: (mapped[2].x + mapped[3].x) / 2, y: (mapped[2].y + mapped[3].y) / 2 };
+        const midW = { x: (mapped[3].x + mapped[0].x) / 2, y: (mapped[3].y + mapped[0].y) / 2 };
 
-          const allPts = useLBrackets ? [...worldPts] : [...worldPts, midN, midE, midS, midW];
+        const allPts = useLBrackets ? [...worldPts] : [...worldPts, midN, midE, midS, midW];
 
-          // Detect current rotation for cursor mapping
-          const matrix = getElementMatrix(el);
-          const rotation = Math.round(Math.atan2(matrix.b, matrix.a) * (180 / Math.PI));
+        // Detect current rotation for cursor mapping
+        const matrix = getElementMatrix(el);
+        const rotation = Math.round(Math.atan2(matrix.b, matrix.a) * (180 / Math.PI));
 
-          allPts.forEach((p, i) => {
-            const name = handleNames[i];
-            const isSide = ['n', 'e', 's', 'w'].includes(name);
-            const handleId = `resize-handle-${el.id}-${name}`;
-            let handle = htmlOverlay?.querySelector(`[id="${handleId}"]`);
+        allPts.forEach((p, i) => {
+          const name = handleNames[i];
+          const isSide = ['n', 'e', 's', 'w'].includes(name);
+          const handleId = `resize-handle-${el.id}-${name}`;
+          let handle = htmlOverlay?.querySelector(`[id="${handleId}"]`);
 
-            if (!handle && htmlOverlay) {
-              handle = document.createElement('div');
-              handle.id = handleId;
-              handle.className = `resize-handle overlay-type-${type} absolute`;
+          if (!handle && htmlOverlay) {
+            handle = document.createElement('div');
+            handle.id = handleId;
+            handle.className = `resize-handle overlay-type-${type} absolute`;
 
+            if (useLBrackets) {
+              // Special L-corner for Interaction Mode and Free Frame
+              handle.style.backgroundColor = 'transparent';
+              handle.style.border = 'none';
+              handle.style.boxShadow = 'none';
+              if ((activeTopTool === 'interaction' || activeTopTool === 'animation') && el.getAttribute('data-name') !== 'Free Frame') {
+                handle.style.pointerEvents = 'none';
+              }
+
+              // Create the L-shape using inner divs
+              const hBar = document.createElement('div');
+              const vBar = document.createElement('div');
+              [hBar, vBar].forEach(bar => {
+                bar.style.position = 'absolute';
+                bar.style.backgroundColor = '#000000';
+                bar.style.border = 'none';
+                bar.style.boxSizing = 'border-box';
+                bar.style.pointerEvents = 'none';
+              });
+
+              const barThickness = 3;
+              hBar.style.width = '100%';
+              hBar.style.height = `${barThickness}px`;
+              vBar.style.width = `${barThickness}px`;
+              vBar.style.height = '100%';
+
+              // Align bars based on corner
+              if (name === 'nw') { hBar.style.top = '0'; hBar.style.left = '0'; vBar.style.top = '0'; vBar.style.left = '0'; }
+              if (name === 'ne') { hBar.style.top = '0'; hBar.style.right = '0'; vBar.style.top = '0'; vBar.style.right = '0'; }
+              if (name === 'se') { hBar.style.bottom = '0'; hBar.style.right = '0'; vBar.style.bottom = '0'; vBar.style.right = '0'; }
+              if (name === 'sw') { hBar.style.bottom = '0'; hBar.style.left = '0'; vBar.style.bottom = '0'; vBar.style.left = '0'; }
+
+              handle.appendChild(hBar);
+              handle.appendChild(vBar);
+            } else if (isSide) {
+              // Edge-handle: Invisible, but large hit area
+              handle.style.backgroundColor = 'rgba(255, 255, 255, 0.01)';
+            } else {
+              // Corner-handle: Professional white square
+              handle.style.backgroundColor = '#FFFFFF';
+              handle.style.border = '1.5px solid #6366F1';
+              handle.style.boxShadow = '0 1.5px 4px rgba(0,0,0,0.2)';
+              handle.style.borderRadius = '2px';
+            }
+
+            handle.style.boxSizing = 'border-box';
+            handle.style.pointerEvents = 'auto';
+            handle.style.zIndex = isSide ? '999' : '1000';
+            htmlOverlay.appendChild(handle);
+          }
+
+          if (handle) {
+            if (isSide && !useLBrackets) {
+              const zoomScale = zoom / 100;
+              const isHorizontal = (name === 'n' || name === 's');
+              const rawLength = (isHorizontal ? bbox.width : bbox.height) * scale;
+              const length = Math.max(rawLength, 20);
+              const thickness = 16 / zoomScale;
+
+              handle.style.width = isHorizontal ? `${length}px` : `${thickness}px`;
+              handle.style.height = isHorizontal ? `${thickness}px` : `${length}px`;
+              handle.style.left = `${p.x}px`;
+              handle.style.top = `${p.y}px`;
+              handle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+            } else {
+              const zoomScale = zoom / 100;
+              // Standard corner handle positioning
+              handle.style.width = `${handleSize}px`;
+              handle.style.height = `${handleSize}px`;
+
+              // Move handles slightly inward
+              let posX = p.x;
+              let posY = p.y;
               if (useLBrackets) {
-                // Special L-corner for Interaction Mode and Free Frame
-                handle.style.backgroundColor = 'transparent';
-                handle.style.border = 'none';
-                handle.style.boxShadow = 'none';
-                if ((activeTopTool === 'interaction' || activeTopTool === 'animation') && el.getAttribute('data-name') !== 'Free Frame') {
-                  handle.style.pointerEvents = 'none';
-                }
-
-                // Create the L-shape using inner divs
-                const hBar = document.createElement('div');
-                const vBar = document.createElement('div');
-                [hBar, vBar].forEach(bar => {
-                  bar.style.position = 'absolute';
-                  bar.style.backgroundColor = '#000000';
-                  bar.style.border = 'none';
-                  bar.style.boxSizing = 'border-box';
-                  bar.style.pointerEvents = 'none';
-                });
-
-                const barThickness = 3;
-                hBar.style.width = '100%';
-                hBar.style.height = `${barThickness}px`;
-                vBar.style.width = `${barThickness}px`;
-                vBar.style.height = '100%';
-
-                // Align bars based on corner
-                if (name === 'nw') { hBar.style.top = '0'; hBar.style.left = '0'; vBar.style.top = '0'; vBar.style.left = '0'; }
-                if (name === 'ne') { hBar.style.top = '0'; hBar.style.right = '0'; vBar.style.top = '0'; vBar.style.right = '0'; }
-                if (name === 'se') { hBar.style.bottom = '0'; hBar.style.right = '0'; vBar.style.bottom = '0'; vBar.style.right = '0'; }
-                if (name === 'sw') { hBar.style.bottom = '0'; hBar.style.left = '0'; vBar.style.bottom = '0'; vBar.style.left = '0'; }
-
-                handle.appendChild(hBar);
-                handle.appendChild(vBar);
-              } else if (isSide) {
-                // Edge-handle: Invisible, but large hit area
-                handle.style.backgroundColor = 'rgba(255, 255, 255, 0.01)';
-              } else {
-                // Corner-handle: Professional white square
-                handle.style.backgroundColor = '#FFFFFF';
-                handle.style.border = '1.5px solid #6366F1';
-                handle.style.boxShadow = '0 1.5px 4px rgba(0,0,0,0.2)';
-                handle.style.borderRadius = '2px';
+                // Offset of 4.5 aligns the center of the 3px bar exactly with the dotted line (handleSize 12/2 - barThickness 3/2 = 4.5)
+                const inwardOffset = 4.5 / zoomScale;
+                if (name === 'nw') { posX += inwardOffset; posY += inwardOffset; }
+                if (name === 'ne') { posX -= inwardOffset; posY += inwardOffset; }
+                if (name === 'se') { posX -= inwardOffset; posY -= inwardOffset; }
+                if (name === 'sw') { posX += inwardOffset; posY -= inwardOffset; }
               }
 
-              handle.style.boxSizing = 'border-box';
-              handle.style.pointerEvents = 'auto';
-              handle.style.zIndex = isSide ? '999' : '1000';
-              htmlOverlay.appendChild(handle);
+              handle.style.left = `${posX}px`;
+              handle.style.top = `${posY}px`;
+              handle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${1 / zoomScale})`;
             }
-
-            if (handle) {
-              if (isSide && !useLBrackets) {
-                const zoomScale = zoom / 100;
-                const isHorizontal = (name === 'n' || name === 's');
-                const rawLength = (isHorizontal ? bbox.width : bbox.height) * scale;
-                const length = Math.max(rawLength, 20);
-                const thickness = 16 / zoomScale;
-
-                handle.style.width = isHorizontal ? `${length}px` : `${thickness}px`;
-                handle.style.height = isHorizontal ? `${thickness}px` : `${length}px`;
-                handle.style.left = `${p.x}px`;
-                handle.style.top = `${p.y}px`;
-                handle.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-              } else {
-                const zoomScale = zoom / 100;
-                // Standard corner handle positioning
-                handle.style.width = `${handleSize}px`;
-                handle.style.height = `${handleSize}px`;
-
-                // Move handles slightly inward
-                let posX = p.x;
-                let posY = p.y;
-                if (useLBrackets) {
-                  // Offset of 4.5 aligns the center of the 3px bar exactly with the dotted line (handleSize 12/2 - barThickness 3/2 = 4.5)
-                  const inwardOffset = 4.5 / zoomScale;
-                  if (name === 'nw') { posX += inwardOffset; posY += inwardOffset; }
-                  if (name === 'ne') { posX -= inwardOffset; posY += inwardOffset; }
-                  if (name === 'se') { posX -= inwardOffset; posY -= inwardOffset; }
-                  if (name === 'sw') { posX += inwardOffset; posY -= inwardOffset; }
-                }
-
-                handle.style.left = `${posX}px`;
-                handle.style.top = `${posY}px`;
-                handle.style.transform = `translate(-50%, -50%) scale(${1 / zoomScale})`;
-              }
-              handle.style.cursor = getRotatingCursor(name, rotation);
-            }
-          });
-        } // Close if (!hideHandles)
+            handle.style.cursor = getRotatingCursor(name, rotation);
+          }
+        });
+      } // Close if (!hideHandles)
 
         // ── INTERACTION BADGE (Floating above the top-middle) ──
         if (activeTopTool === 'interaction') {
@@ -2858,13 +2893,13 @@ const MainEditor = ({
         setSelectedPenTool('pencil');
       } else if (e.key.toLowerCase() === 'g' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-
+        
         const activeContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
         const svg = activeContainer?.querySelector('svg');
         if (!svg) return;
 
-        const ids = multiSelectedIdsRef.current.size > 0
-          ? Array.from(multiSelectedIdsRef.current)
+        const ids = multiSelectedIdsRef.current.size > 0 
+          ? Array.from(multiSelectedIdsRef.current) 
           : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
 
         const isUngroup = e.shiftKey;
@@ -2886,7 +2921,7 @@ const MainEditor = ({
             });
 
             if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
-
+            
             if (setSelectedLayerId) setSelectedLayerId(group.id);
             if (setMultiSelectedIds) setMultiSelectedIds(new Set([group.id]));
           }
@@ -2900,8 +2935,8 @@ const MainEditor = ({
           ids.forEach(id => {
             let el = svg.querySelector(`[id="${id}"]`);
             if (el && el.tagName.toLowerCase() !== 'g') {
-              let parentG = el.closest('g');
-              if (parentG) el = parentG;
+               let parentG = el.closest('g');
+               if (parentG) el = parentG;
             }
             if (el && el.tagName.toLowerCase() === 'g') {
               const elName = el.getAttribute('data-name') || '';
@@ -2917,7 +2952,7 @@ const MainEditor = ({
           groupsToUngroup.forEach(el => {
             const parent = el.parentNode;
             const children = Array.from(el.childNodes);
-
+            
             const groupTransform = el.getAttribute('transform') || '';
             const inheritableAttrs = ['fill', 'stroke', 'stroke-width', 'opacity', 'font-family', 'font-size', 'font-weight', 'color', 'letter-spacing', 'stroke-linecap', 'stroke-linejoin'];
             const inheritedStyles = {};
@@ -2926,28 +2961,28 @@ const MainEditor = ({
             });
 
             children.forEach((child, idx) => {
-              if (child.nodeType === 1) { // ELEMENT_NODE
-                if (!child.id) {
-                  child.id = `ungrouped-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
-                }
+               if (child.nodeType === 1) { // ELEMENT_NODE
+                 if (!child.id) {
+                   child.id = `ungrouped-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+                 }
 
-                if (groupTransform) {
-                  const childTransform = child.getAttribute('transform') || '';
-                  child.setAttribute('transform', `${groupTransform} ${childTransform}`.trim());
-                }
+                 if (groupTransform) {
+                   const childTransform = child.getAttribute('transform') || '';
+                   child.setAttribute('transform', `${groupTransform} ${childTransform}`.trim());
+                 }
 
-                // Apply inherited styles to child if it doesn't override them
-                Object.entries(inheritedStyles).forEach(([attr, val]) => {
-                  if (!child.hasAttribute(attr)) {
-                    child.setAttribute(attr, val);
-                  }
-                });
+                 // Apply inherited styles to child if it doesn't override them
+                 Object.entries(inheritedStyles).forEach(([attr, val]) => {
+                   if (!child.hasAttribute(attr)) {
+                     child.setAttribute(attr, val);
+                   }
+                 });
 
-                parent.insertBefore(child, el);
-                if (child.id) newSelectedIds.add(child.id);
-              }
+                 parent.insertBefore(child, el);
+                 if (child.id) newSelectedIds.add(child.id);
+               }
             });
-
+            
             parent.removeChild(el);
             hasChanges = true;
           });
@@ -2963,8 +2998,8 @@ const MainEditor = ({
         // Core Logic: Delete selected element
         e.preventDefault();
 
-        const ids = multiSelectedIdsRef.current.size > 0
-          ? Array.from(multiSelectedIdsRef.current)
+        const ids = multiSelectedIdsRef.current.size > 0 
+          ? Array.from(multiSelectedIdsRef.current) 
           : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
 
         if (ids.length === 0) return;
@@ -3044,10 +3079,10 @@ const MainEditor = ({
     window.addEventListener('keydown', handleKeyDown);
 
     const handleTriggerGroup = () => {
-      handleKeyDown({ key: 'g', ctrlKey: true, preventDefault: () => { } });
+      handleKeyDown({ key: 'g', ctrlKey: true, preventDefault: () => {} });
     };
     const handleTriggerUngroup = () => {
-      handleKeyDown({ key: 'G', ctrlKey: true, shiftKey: true, preventDefault: () => { } });
+      handleKeyDown({ key: 'G', ctrlKey: true, shiftKey: true, preventDefault: () => {} });
     };
     window.addEventListener('trigger-group', handleTriggerGroup);
     window.addEventListener('trigger-ungroup', handleTriggerUngroup);
@@ -3586,18 +3621,22 @@ const MainEditor = ({
     }
 
 
-    const idsToHighlight = multiSelectedIds.size > 0
-      ? multiSelectedIds
-      : (selectedLayerId ? new Set([selectedLayerId]) : new Set());
+    if (multiSelectedIds.size > 1) {
+      drawMultiSelectionHighlight(multiSelectedIds, 'selected');
+    } else {
+      const idsToHighlight = multiSelectedIds.size > 0
+        ? multiSelectedIds
+        : (selectedLayerId ? new Set([selectedLayerId]) : new Set());
 
-    idsToHighlight.forEach(id => {
-      document.querySelectorAll(`[id="${id}"]`).forEach(el => {
-        // Highlights across multiple pages are drawn in their respective containers
-        const type = (currentFrameId && id !== currentFrameId) ? 'child-selected' : 'selected';
-        el.setAttribute(`data-${type}`, 'true');
-        drawOverlayHighlight(el, type);
+      idsToHighlight.forEach(id => {
+        document.querySelectorAll(`[id="${id}"]`).forEach(el => {
+          // Highlights across multiple pages are drawn in their respective containers
+          const type = (currentFrameId && id !== currentFrameId) ? 'child-selected' : 'selected';
+          el.setAttribute(`data-${type}`, 'true');
+          drawOverlayHighlight(el, type);
+        });
       });
-    });
+    }
 
     if (currentFrameId) {
       document.querySelectorAll(`[id="${currentFrameId}"]`).forEach(el => {
@@ -3629,13 +3668,6 @@ const MainEditor = ({
 
   // Helper: get direct children of a given element that have IDs
   const getDirectChildFrames = (el) => {
-    // PREVENT drill-down into structural groups (keeps them monolithic)
-    if (el.getAttribute('data-is-image-group') === 'true' || 
-        el.getAttribute('data-is-video-group') === 'true' || 
-        el.getAttribute('data-is-gif-group') === 'true') {
-      return [];
-    }
-
     return Array.from(el.children).filter(child =>
       child.id &&
       child.tagName.toLowerCase() !== 'style' &&
@@ -3734,12 +3766,6 @@ const MainEditor = ({
       current = current.parentElement || current.parentNode;
     }
 
-    // Figma-like auto-promotion for image groups: always drag the entire group
-    const imgGroup = current?.closest ? current.closest('g[data-is-image-group="true"]') : null;
-    if (imgGroup && imgGroup !== canvasRoot) {
-      return imgGroup;
-    }
-
     while (current && current !== canvasRoot && current.tagName) {
       const tagName = current.tagName.toLowerCase();
 
@@ -3808,7 +3834,7 @@ const MainEditor = ({
               if (isScrollable) {
                 const rect = target.getBoundingClientRect();
                 const isScrollbarClick = event.clientX > rect.left + target.clientLeft + target.clientWidth ||
-                  event.clientY > rect.top + target.clientTop + target.clientHeight;
+                                         event.clientY > rect.top + target.clientTop + target.clientHeight;
                 if (isScrollbarClick) {
                   event.interaction.stop();
                   return;
@@ -3838,14 +3864,28 @@ const MainEditor = ({
             if (selectedSelectToolRef.current !== 'direct' && (target === event.target || target.tagName?.toLowerCase() === 'svg')) {
               const multiIds = multiSelectedIdsRef.current;
               if (multiIds.size > 1) {
+                let hitElement = false;
                 for (const id of multiIds) {
                   const el = container?.querySelector(`[id="${id}"]`);
                   if (el && el !== svgElement) {
                     if (hitTest(el, event.clientX, event.clientY, 2)) {
                       target = el;
+                      hitElement = true;
                       break;
                     }
                   }
+                }
+                
+                if (!hitElement) {
+                   const multiPoly = container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi-selection-bounds') || container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi');
+                   if (multiPoly) {
+                      const rect = multiPoly.getBoundingClientRect();
+                      if (event.clientX >= rect.left && event.clientX <= rect.right &&
+                          event.clientY >= rect.top && event.clientY <= rect.bottom) {
+                         const firstEl = container?.querySelector(`[id="${Array.from(multiIds)[0]}"]`);
+                         if (firstEl) target = firstEl;
+                      }
+                   }
                 }
               }
             }
@@ -4054,16 +4094,15 @@ const MainEditor = ({
               for (const item of dragState.multiDragItems) {
                 const currentPointLocal = getLocalPoint(dragState.svgElement, item.element.parentNode, event.clientX, event.clientY);
                 if (!currentPointLocal || !item.startPointLocal) continue;
-
+                
                 const dx = currentPointLocal.x - item.startPointLocal.x;
                 const dy = currentPointLocal.y - item.startPointLocal.y;
 
                 const translation = new DOMMatrix().translate(dx, dy);
                 const nextMatrix = translation.multiply(item.initialMatrix);
                 item.element.setAttribute('transform', matrixToTransform(nextMatrix));
-                // dynamically update the outline while dragging
-                drawOverlayHighlight(item.element, currentFrameIdRef.current && item.element.id !== currentFrameIdRef.current ? 'child-selected' : 'selected');
               }
+              drawMultiSelectionHighlight(multiSelectedIdsRef.current, 'selected');
             } else {
               // Single element drag
               const target = dragState.element;
@@ -4109,15 +4148,15 @@ const MainEditor = ({
               }
             };
 
-            const constrainElement = (el, onComplete) => {
+             const constrainElement = (el, onComplete) => {
               if (!el || typeof el.getBBox !== 'function') return false;
-
+              
               let ctm, rootCtm, parentCtm;
               try {
                 ctm = el.getScreenCTM();
                 rootCtm = dragState.svgElement.getScreenCTM();
                 parentCtm = el.parentNode.getScreenCTM();
-              } catch (e) {
+              } catch(e) {
                 return false;
               }
               if (!ctm || !rootCtm || !parentCtm) return false;
@@ -4147,7 +4186,7 @@ const MainEditor = ({
                 const rootToParent = parentCtm.inverse().multiply(rootCtm);
                 const p0 = new DOMPoint(0, 0).matrixTransform(rootToParent);
                 const p1 = new DOMPoint(dx_root, dy_root).matrixTransform(rootToParent);
-
+                
                 const dx = p1.x - p0.x;
                 const dy = p1.y - p0.y;
 
@@ -4232,25 +4271,86 @@ const MainEditor = ({
             const elId = match[1];
             const dir = match[2];
             let el = document.getElementById(elId);
-            if (!el) return;
+            
+            // If grabbing the multi-selection bounding box handles, force into multi path.
+            // (The dummy <rect id="multi-selection-bounds"> lives in the overlay SVG, so
+            //  getElementById() finds it — but we must NOT treat it as a real canvas element.)
+            if (el && (elId === 'multi' || elId === 'multi-selection-bounds') && multiSelectedIdsRef.current.size > 1) {
+              el = null;
+            }
+
+            let isMulti = false;
+            let multiIds = [];
+            let bbox = null;
+            let matrix = new DOMMatrix();
+
+            if (!el) {
+              if ((elId === 'multi' || elId === 'multi-selection-bounds') && multiSelectedIdsRef.current.size > 1) {
+                isMulti = true;
+                multiIds = Array.from(multiSelectedIdsRef.current);
+                
+                const childrenList = multiIds.map(id => document.getElementById(id)).filter(Boolean);
+                if (childrenList.length === 0) return;
+                
+                const canvasSvg = childrenList[0].ownerSVGElement;
+                if (!canvasSvg) return;
+                const svgRootCTM = canvasSvg.getScreenCTM();
+                if (!svgRootCTM) return;
+                const svgRootInv = svgRootCTM.inverse();
+
+                // Helper: convert a child's local bbox corner to SVG root space
+                const childLocalToSvgRoot = (child, px, py) => {
+                  const childCTM = child.getScreenCTM();
+                  if (!childCTM) return { x: px, y: py };
+                  // screen = childCTM * local, svgRoot = svgRootInv * screen
+                  return new DOMPoint(px, py).matrixTransform(childCTM).matrixTransform(svgRootInv);
+                };
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                childrenList.forEach(child => {
+                  const cb = getVisualBBox(child);
+                  const p1 = childLocalToSvgRoot(child, cb.x, cb.y);
+                  const p2 = childLocalToSvgRoot(child, cb.x + cb.width, cb.y);
+                  const p3 = childLocalToSvgRoot(child, cb.x, cb.y + cb.height);
+                  const p4 = childLocalToSvgRoot(child, cb.x + cb.width, cb.y + cb.height);
+                  minX = Math.min(minX, p1.x, p2.x, p3.x, p4.x);
+                  maxX = Math.max(maxX, p1.x, p2.x, p3.x, p4.x);
+                  minY = Math.min(minY, p1.y, p2.y, p3.y, p4.y);
+                  maxY = Math.max(maxY, p1.y, p2.y, p3.y, p4.y);
+                });
+                
+                bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+                matrix = new DOMMatrix();
+                
+                el = {
+                  id: 'multi-selection-bounds',
+                  tagName: 'multi',
+                  getAttribute: () => null,
+                  getScreenCTM: () => canvasSvg.getScreenCTM(),
+                  parentNode: canvasSvg,
+                  ownerSVGElement: canvasSvg,
+                  _svgRootInv: svgRootInv,
+                  _childLocalToSvgRoot: childLocalToSvgRoot
+                };
+              } else {
+                return;
+              }
+            } else {
+               matrix = getElementMatrix(el);
+               bbox = getVisualBBox(el);
+            }
 
             const svg = el.ownerSVGElement;
             const startPoint = getSvgPoint(svg, event.clientX, event.clientY);
-            const matrix = getElementMatrix(el);
-            const bbox = getVisualBBox(el);
 
             // ── CONVERT <text> TO <foreignObject> ON RESIZE START ──
-            if (el.tagName.toLowerCase() === 'text') {
+            if (!isMulti && el.tagName.toLowerCase() === 'text') {
               const fo = convertTextToForeignObject(el);
               if (fo) {
                 el.replaceWith(fo);
                 el = fo;
               }
             }
-
-            // ── BRING TO FRONT ──
-            // Removed to prevent unintentional layer reordering when resizing
-
 
             // Lock cursor globally while dragging to prevent flicker
             const currentCursor = window.getComputedStyle(handle).cursor;
@@ -4272,18 +4372,35 @@ const MainEditor = ({
             const worldAnchor = new DOMPoint(localAnchor.x, localAnchor.y).matrixTransform(matrix);
 
             let childrenData = null;
-            if (el.tagName.toLowerCase() === 'g') {
-              childrenData = Array.from(el.children).map(child => {
+            if (isMulti || (el.tagName && el.tagName.toLowerCase() === 'g')) {
+              const childrenList = isMulti ? multiIds.map(id => document.getElementById(id)).filter(Boolean) : Array.from(el.children);
+              const childLocalToSvgRoot = el._childLocalToSvgRoot;
+              childrenData = childrenList.map(child => {
                 const cb = getVisualBBox(child);
                 const cMatrix = getElementMatrix(child);
-                const p1 = new DOMPoint(cb.x, cb.y).matrixTransform(cMatrix);
-                const p2 = new DOMPoint(cb.x + cb.width, cb.y).matrixTransform(cMatrix);
-                const p3 = new DOMPoint(cb.x, cb.y + cb.height).matrixTransform(cMatrix);
-                const p4 = new DOMPoint(cb.x + cb.width, cb.y + cb.height).matrixTransform(cMatrix);
-                const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
-                const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
-                const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
-                const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+
+                let minX, maxX, minY, maxY;
+                if (isMulti && childLocalToSvgRoot) {
+                  // For multi-selection: convert to SVG root space via getScreenCTM
+                  const p1 = childLocalToSvgRoot(child, cb.x, cb.y);
+                  const p2 = childLocalToSvgRoot(child, cb.x + cb.width, cb.y);
+                  const p3 = childLocalToSvgRoot(child, cb.x, cb.y + cb.height);
+                  const p4 = childLocalToSvgRoot(child, cb.x + cb.width, cb.y + cb.height);
+                  minX = Math.min(p1.x, p2.x, p3.x, p4.x);
+                  maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
+                  minY = Math.min(p1.y, p2.y, p3.y, p4.y);
+                  maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+                } else {
+                  // For single-element groups: use element's own matrix (parent-local space)
+                  const p1 = new DOMPoint(cb.x, cb.y).matrixTransform(cMatrix);
+                  const p2 = new DOMPoint(cb.x + cb.width, cb.y).matrixTransform(cMatrix);
+                  const p3 = new DOMPoint(cb.x, cb.y + cb.height).matrixTransform(cMatrix);
+                  const p4 = new DOMPoint(cb.x + cb.width, cb.y + cb.height).matrixTransform(cMatrix);
+                  minX = Math.min(p1.x, p2.x, p3.x, p4.x);
+                  maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
+                  minY = Math.min(p1.y, p2.y, p3.y, p4.y);
+                  maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
+                }
                 const bound = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 
                 const fracX = (bbox.width - bound.width) <= 0.001 ? 0.5 : (bound.x - bbox.x) / (bbox.width - bound.width);
@@ -4360,10 +4477,10 @@ const MainEditor = ({
             if (dir === 'e' || dir === 'w') scaleY = 1;
 
             // Maintain Aspect Ratio for images, text, or if Shift key is held (only for corners, but force for text on all handles to prevent distortion)
-            const isImage = el.getAttribute('data-type') === 'image' || el.tagName.toLowerCase() === 'image' || el.getAttribute('data-type') === 'video' || el.getAttribute('data-type') === 'gif';
-            const isText = el.getAttribute('data-type') === 'text' || el.tagName.toLowerCase() === 'text';
-            const isForeignObject = el.tagName.toLowerCase() === 'foreignobject';
-            const isGroup = el.tagName.toLowerCase() === 'g' && !el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group');
+            const isImage = el.getAttribute('data-type') === 'image' || el.tagName?.toLowerCase() === 'image' || el.getAttribute('data-type') === 'video' || el.getAttribute('data-type') === 'gif';
+            const isText = el.getAttribute('data-type') === 'text' || el.tagName?.toLowerCase() === 'text';
+            const isForeignObject = el.tagName?.toLowerCase() === 'foreignobject';
+            const isGroup = (el.tagName?.toLowerCase() === 'g' && !el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group')) || el.tagName === 'multi';
             const isCorner = ['nw', 'ne', 'se', 'sw'].includes(dir);
 
             if ((isCorner && (event.shiftKey || isImage || (isText && !isForeignObject))) || (!isCorner && (isText && !isForeignObject))) {
@@ -4379,7 +4496,7 @@ const MainEditor = ({
               }
             }
 
-            const isFreeFrame = (el.getAttribute('data-name') === 'Free Frame' && el.tagName.toLowerCase() === 'rect') || el.tagName.toLowerCase() === 'foreignobject';
+            const isFreeFrame = (el.getAttribute('data-name') === 'Free Frame' && el.tagName?.toLowerCase() === 'rect') || el.tagName?.toLowerCase() === 'foreignobject';
 
             if (isFreeFrame || isGroup) {
               const newLocalX = state.localAnchor.x + (bbox.x - state.localAnchor.x) * scaleX;
@@ -4398,19 +4515,19 @@ const MainEditor = ({
                 let adjustedX = finalX;
                 let adjustedY = finalY;
 
-                if (el.tagName.toLowerCase() === 'foreignobject' && el.firstElementChild) {
+                if (el.tagName?.toLowerCase() === 'foreignobject' && el.firstElementChild) {
                   const isScrollable = el.getAttribute('data-scrollable') === 'true';
                   const div = el.firstElementChild;
-
+                  
                   // Enable reflow when resizing horizontally
                   if (dir === 'e' || dir === 'w' || dir === 'se' || dir === 'sw' || dir === 'ne' || dir === 'nw') {
-                    el.setAttribute('data-resized', 'true');
-                    div.style.whiteSpace = 'pre-wrap';
+                      el.setAttribute('data-resized', 'true');
+                      div.style.whiteSpace = 'pre-wrap';
                   }
-
+                  
                   const oldHeight = div.style.height;
                   const oldMinHeight = div.style.minHeight;
-
+                  
                   // Temporarily allow height to shrink to measure true text height
                   div.style.setProperty('height', 'auto', 'important');
                   div.style.setProperty('min-height', '0px', 'important');
@@ -4424,7 +4541,7 @@ const MainEditor = ({
                       let minW = 10;
                       let maxW = 3000;
                       let bestW = finalWidth;
-
+                      
                       for (let i = 0; i < 12; i++) {
                         let midW = (minW + maxW) / 2;
                         el.setAttribute('width', midW);
@@ -4446,10 +4563,10 @@ const MainEditor = ({
                     // Scrollable text boxes CAN hide content. We respect the user's manual sizing exactly.
                     // No auto-height adjustments here.
                   }
-
+                  
                   div.style.setProperty('height', oldHeight || '100%', 'important');
                   div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
-
+                  
                   // Adjust coordinates to respect the handle anchor
                   if (dir === 'w' || dir === 'nw' || dir === 'sw') {
                     adjustedX = (finalX + finalWidth) - adjustedWidth;
@@ -4459,27 +4576,163 @@ const MainEditor = ({
                     if (align === 'center') adjustedX = finalX - (widthDiff / 2);
                     else if (align === 'right' || align === 'end') adjustedX = finalX - widthDiff;
                   }
-
+                  
                   if (dir === 'n' || dir === 'nw' || dir === 'ne') {
                     adjustedY = (finalY + finalHeight) - adjustedHeight;
                   }
                 }
-
+                
                 el.setAttribute('x', adjustedX);
                 el.setAttribute('y', adjustedY);
                 el.setAttribute('width', adjustedWidth);
                 el.setAttribute('height', adjustedHeight);
               } else if (isGroup && state.childrenData) {
-                state.childrenData.forEach(cData => {
-                  const { child, initialMatrix, bound, fracX, fracY } = cData;
-                  const newCbX = finalX + fracX * (finalWidth - bound.width);
-                  const newCbY = finalY + fracY * (finalHeight - bound.height);
-                  const dx = newCbX - bound.x;
-                  const dy = newCbY - bound.y;
-                  const translateMatrix = new DOMMatrix().translate(dx, dy);
-                  const newChildMatrix = translateMatrix.multiply(initialMatrix);
-                  child.setAttribute('transform', matrixToTransform(newChildMatrix));
-                });
+                const isMultiSel = el.tagName === 'multi';
+
+                if (isMultiSel) {
+                  // ── MULTI-SELECTION PATH ──────────────────────────────────────────
+                  // bound is in SVG root space (computed via getScreenCTM in start).
+                  // worldAnchor is also in SVG root space (localAnchor * identity matrix).
+                  // svgCoordsToParent converts SVG root → child's parent local coords.
+
+                  const svgCoordsToParent = (child, svgX, svgY, svgW, svgH) => {
+                    const parentEl = child.parentNode;
+                    const canvasSVGEl = child.ownerSVGElement;
+                    const parentCTMLocal = parentEl?.getScreenCTM?.();
+                    const svgCTM = canvasSVGEl?.getScreenCTM?.();
+                    if (!parentCTMLocal || !svgCTM) return { x: svgX, y: svgY, width: svgW, height: svgH };
+                    const parentInv = parentCTMLocal.inverse();
+                    const ptTL = new DOMPoint(svgX, svgY).matrixTransform(svgCTM).matrixTransform(parentInv);
+                    const ptBR = new DOMPoint(svgX + svgW, svgY + svgH).matrixTransform(svgCTM).matrixTransform(parentInv);
+                    return {
+                      x: Math.min(ptTL.x, ptBR.x),
+                      y: Math.min(ptTL.y, ptBR.y),
+                      width: Math.abs(ptBR.x - ptTL.x),
+                      height: Math.abs(ptBR.y - ptTL.y)
+                    };
+                  };
+
+                  state.childrenData.forEach(cData => {
+                    const { child, initialMatrix, bound } = cData;
+                    const tag = child.tagName?.toLowerCase();
+                    const isChildText = tag === 'text' || child.getAttribute('data-type') === 'text';
+
+                    const newMinX = worldAnchor.x + (bound.x - worldAnchor.x) * scaleX;
+                    const newMinY = worldAnchor.y + (bound.y - worldAnchor.y) * scaleY;
+                    const newMaxX = worldAnchor.x + (bound.x + bound.width - worldAnchor.x) * scaleX;
+                    const newMaxY = worldAnchor.y + (bound.y + bound.height - worldAnchor.y) * scaleY;
+                    const newSvgX = Math.min(newMinX, newMaxX);
+                    const newSvgY = Math.min(newMinY, newMaxY);
+                    const newSvgW = Math.abs(newMaxX - newMinX);
+                    const newSvgH = Math.abs(newMaxY - newMinY);
+
+                    if (isChildText) {
+                      const localNew = svgCoordsToParent(child, newSvgX, newSvgY, newSvgW, newSvgH);
+                      const localOld = svgCoordsToParent(child, bound.x, bound.y, bound.width, bound.height);
+                      const dx = localNew.x - localOld.x;
+                      const dy = localNew.y - localOld.y;
+                      child.setAttribute('transform', matrixToTransform(new DOMMatrix().translate(dx, dy).multiply(initialMatrix)));
+                    } else if (tag === 'rect' || tag === 'foreignobject') {
+                      const hasTransform = child.getAttribute('transform');
+                      if (!hasTransform || hasTransform === 'matrix(1 0 0 1 0 0)') {
+                        const local = svgCoordsToParent(child, newSvgX, newSvgY, newSvgW, newSvgH);
+                        child.setAttribute('x', local.x);
+                        child.setAttribute('y', local.y);
+                        child.setAttribute('width', local.width);
+                        child.setAttribute('height', local.height);
+                      } else {
+                        const sm = new DOMMatrix().translate(worldAnchor.x, worldAnchor.y).scale(scaleX, scaleY).translate(-worldAnchor.x, -worldAnchor.y);
+                        child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                      }
+                    } else if (tag === 'circle' || tag === 'ellipse') {
+                      const hasTransform = child.getAttribute('transform');
+                      if (!hasTransform || hasTransform === 'matrix(1 0 0 1 0 0)') {
+                        const local = svgCoordsToParent(child, newSvgX, newSvgY, newSvgW, newSvgH);
+                        if (tag === 'circle') {
+                          child.setAttribute('cx', local.x + local.width / 2);
+                          child.setAttribute('cy', local.y + local.height / 2);
+                          child.setAttribute('r', Math.min(local.width, local.height) / 2);
+                        } else {
+                          child.setAttribute('cx', local.x + local.width / 2);
+                          child.setAttribute('cy', local.y + local.height / 2);
+                          child.setAttribute('rx', local.width / 2);
+                          child.setAttribute('ry', local.height / 2);
+                        }
+                      } else {
+                        const sm = new DOMMatrix().translate(worldAnchor.x, worldAnchor.y).scale(scaleX, scaleY).translate(-worldAnchor.x, -worldAnchor.y);
+                        child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                      }
+                    } else {
+                      const sm = new DOMMatrix().translate(worldAnchor.x, worldAnchor.y).scale(scaleX, scaleY).translate(-worldAnchor.x, -worldAnchor.y);
+                      child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                    }
+                  });
+
+                } else {
+                  // ── REAL <g> GROUP PATH ───────────────────────────────────────────
+                  // bound is in <g>'s LOCAL coordinate space (same as child attribute space).
+                  // localAnchor is also in <g>'s local space.
+                  // No CTM conversion needed — just compute new position in <g> local space.
+
+                  const la = state.localAnchor; // anchor in <g> local space
+
+                  state.childrenData.forEach(cData => {
+                    const { child, initialMatrix, bound } = cData;
+                    const tag = child.tagName?.toLowerCase();
+                    const isChildText = tag === 'text' || child.getAttribute('data-type') === 'text';
+
+                    // Scale bound in <g> local space from localAnchor
+                    const newMinX = la.x + (bound.x - la.x) * scaleX;
+                    const newMinY = la.y + (bound.y - la.y) * scaleY;
+                    const newMaxX = la.x + (bound.x + bound.width - la.x) * scaleX;
+                    const newMaxY = la.y + (bound.y + bound.height - la.y) * scaleY;
+                    const newLocX = Math.min(newMinX, newMaxX);
+                    const newLocY = Math.min(newMinY, newMaxY);
+                    const newLocW = Math.abs(newMaxX - newMinX);
+                    const newLocH = Math.abs(newMaxY - newMinY);
+
+                    if (isChildText) {
+                      // Text: translate only
+                      const dx = newLocX - bound.x;
+                      const dy = newLocY - bound.y;
+                      child.setAttribute('transform', matrixToTransform(new DOMMatrix().translate(dx, dy).multiply(initialMatrix)));
+                    } else if (tag === 'rect' || tag === 'foreignobject') {
+                      const hasTransform = child.getAttribute('transform');
+                      if (!hasTransform || hasTransform === 'matrix(1 0 0 1 0 0)') {
+                        // Attributes are already in <g> local space — set directly
+                        child.setAttribute('x', newLocX);
+                        child.setAttribute('y', newLocY);
+                        child.setAttribute('width', newLocW);
+                        child.setAttribute('height', newLocH);
+                      } else {
+                        // Has transform: use local scale matrix
+                        const sm = new DOMMatrix().translate(la.x, la.y).scale(scaleX, scaleY).translate(-la.x, -la.y);
+                        child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                      }
+                    } else if (tag === 'circle' || tag === 'ellipse') {
+                      const hasTransform = child.getAttribute('transform');
+                      if (!hasTransform || hasTransform === 'matrix(1 0 0 1 0 0)') {
+                        if (tag === 'circle') {
+                          child.setAttribute('cx', newLocX + newLocW / 2);
+                          child.setAttribute('cy', newLocY + newLocH / 2);
+                          child.setAttribute('r', Math.min(newLocW, newLocH) / 2);
+                        } else {
+                          child.setAttribute('cx', newLocX + newLocW / 2);
+                          child.setAttribute('cy', newLocY + newLocH / 2);
+                          child.setAttribute('rx', newLocW / 2);
+                          child.setAttribute('ry', newLocH / 2);
+                        }
+                      } else {
+                        const sm = new DOMMatrix().translate(la.x, la.y).scale(scaleX, scaleY).translate(-la.x, -la.y);
+                        child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                      }
+                    } else {
+                      // g, path, polygon, etc — scale via matrix in <g> local space
+                      const sm = new DOMMatrix().translate(la.x, la.y).scale(scaleX, scaleY).translate(-la.x, -la.y);
+                      child.setAttribute('transform', matrixToTransform(sm.multiply(initialMatrix)));
+                    }
+                  });
+                }
               }
             } else {
               const scaleMatrix = new DOMMatrix()
@@ -4492,8 +4745,12 @@ const MainEditor = ({
             }
 
             // Force update selection highlight immediately
-            const highlightType = (currentFrameIdRef.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
-            drawOverlayHighlight(el, highlightType);
+            if (el.tagName === 'multi') {
+              drawMultiSelectionHighlight(multiSelectedIdsRef.current, 'selected');
+            } else {
+              const highlightType = (currentFrameIdRef.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
+              drawOverlayHighlight(el, highlightType);
+            }
           },
           end(event) {
             // Unlock cursor back to default
@@ -4503,7 +4760,9 @@ const MainEditor = ({
 
             const state = event.interaction.resizeState;
             if (state && updatePageHtmlRef.current) {
-              const container = state.el.closest('.page-svg-container');
+              // state.el may be a fake object for multi-selection, use state.svg's container
+              const container = state.svg?.closest?.('.page-svg-container') ||
+                (state.el?.closest ? state.el.closest('.page-svg-container') : null);
               const pageIdx = container ? parseInt(container.getAttribute('data-page-index')) : activePageIndex;
               saveModifiedPageHtml(pageIdx, state.svg);
             }
@@ -4677,7 +4936,7 @@ const MainEditor = ({
         div.style.background = 'transparent';
         div.style.userSelect = 'none';
         div.style.pointerEvents = 'none';
-
+        
         div.innerText = 'Type your text';
         fo.appendChild(div);
 
@@ -4963,19 +5222,32 @@ const MainEditor = ({
       }
     }
 
+    let hitMultiSelectionGap = false;
+    if (currentMultiIds.size > 1 && !hitAnySelected) {
+       const pageContainer = e.currentTarget.closest('.page-svg-container');
+       const multiPoly = pageContainer?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi-selection-bounds') || pageContainer?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi');
+       if (multiPoly) {
+          const polyRect = multiPoly.getBoundingClientRect();
+          if (e.clientX >= polyRect.left && e.clientX <= polyRect.right &&
+              e.clientY >= polyRect.top && e.clientY <= polyRect.bottom) {
+             hitMultiSelectionGap = true;
+          }
+       }
+    }
+
     const topFrames = getTopLevelFrames(svg);
     const hitBaseFrame = hitCandidate && topFrames.some(f => f.id === hitCandidate.id);
 
     // 2. Selection/Drag Priority
-    // If we hit any valid child candidate OR any already-selected element, 
+    // If we hit any valid child candidate OR any already-selected element OR the multi-selection gap, 
     // don't start a marquee. Return early to allow interactjs to handle dragging.
-    if ((hitCandidate && !hitBaseFrame || hitAnySelected) && !e.ctrlKey && selectedSelectToolRef.current !== 'direct') {
+    if ((hitCandidate && !hitBaseFrame || hitAnySelected || hitMultiSelectionGap) && !e.ctrlKey && selectedSelectToolRef.current !== 'direct') {
       return;
     }
 
     // 3. Marquee Start Detection
-    // Start marquee ONLY if forced (Ctrl). Normal drags will not start it.
-    const shouldStartMarquee = e.ctrlKey;
+    // Start marquee if user holds Ctrl OR if they clicked on the background/base frame (but require Ctrl for direct tool, and don't start if exiting text edit)
+    const shouldStartMarquee = e.ctrlKey || ((!hitCandidate || hitBaseFrame) && selectedSelectToolRef.current !== 'direct' && !isEditingTextRef.current);
 
     if (shouldStartMarquee) {
       const rect = container.getBoundingClientRect();
@@ -5223,6 +5495,15 @@ const MainEditor = ({
       const curX = (e.clientX - containerRect.left) / scale;
       const curY = (e.clientY - containerRect.top) / scale;
 
+      if (!marqueeDataRef.current.hasDragged) {
+        const dx = curX - startX;
+        const dy = curY - startY;
+        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+          return;
+        }
+        marqueeDataRef.current.hasDragged = true;
+      }
+
       const x = Math.min(curX, startX);
       const y = Math.min(curY, startY);
       const width = Math.abs(curX - startX);
@@ -5365,8 +5646,10 @@ const MainEditor = ({
 
     // Avoid state updates if selection is identical
     if (!setsAreEqual(newSelectedIds, multiSelectedIdsRef.current)) {
+      multiSelectedIdsRef.current = newSelectedIds;
       setMultiSelectedIds(newSelectedIds);
       const primary = Array.from(newSelectedIds)[newSelectedIds.size - 1];
+      selectedLayerIdRef.current = primary || null;
       setSelectedLayerId(primary || null);
     }
   };
@@ -5503,10 +5786,18 @@ const MainEditor = ({
       }
 
       // Termination for Marquee Selection
-      if (marqueeRef.current) {
+      if (marqueeDataRef.current) {
         setMarquee(null);
         if (marqueeOverlayRef1.current) marqueeOverlayRef1.current.style.display = 'none';
         if (marqueeOverlayRef2.current) marqueeOverlayRef2.current.style.display = 'none';
+        
+        if (marqueeDataRef.current.hasDragged) {
+          suppressClickRef.current = true;
+          setTimeout(() => {
+            suppressClickRef.current = false;
+          }, 100);
+        }
+        marqueeDataRef.current = null;
       }
     };
 
@@ -5557,8 +5848,8 @@ const MainEditor = ({
     div.style.width = '100%';
     div.style.minHeight = '100%';
     if (isScrollable) {
-      div.style.overflowY = 'auto';
-      div.style.overflowX = 'hidden';
+        div.style.overflowY = 'auto';
+        div.style.overflowX = 'hidden';
     }
     div.style.color = el.getAttribute('fill') || '#000000';
     div.style.fontFamily = el.getAttribute('font-family') || 'Inter, sans-serif';
@@ -5584,10 +5875,10 @@ const MainEditor = ({
     div.style.pointerEvents = 'none';
 
     if (!isScrollable) {
-      // Vertically center the text to match SVG bbox placement and prevent upward shift
-      div.style.display = 'flex';
-      div.style.flexDirection = 'column';
-      div.style.justifyContent = 'center';
+        // Vertically center the text to match SVG bbox placement and prevent upward shift
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.justifyContent = 'center';
     }
 
     // Smart tspan-to-lines conversion: group tspans by Y coordinate change
@@ -5597,7 +5888,7 @@ const MainEditor = ({
       let currentLineTspans = [];
       let lastY = null;
       let lineHeights = [];
-
+      
       const fontSizeStr = el.getAttribute('font-size') || el.style.fontSize;
       const fontSize = parseFloat(fontSizeStr) || 10;
 
@@ -5605,23 +5896,23 @@ const MainEditor = ({
         const y = t.getAttribute('y');
         const dy = t.getAttribute('dy');
         const isNewLine = i > 0 && (dy || (y !== null && lastY !== null && Math.abs(parseFloat(y) - parseFloat(lastY)) > 2));
-
+        
         if (isNewLine) {
-          let deltaY = null;
-          if (dy) {
-            if (dy.endsWith('em')) deltaY = parseFloat(dy) * fontSize;
-            else deltaY = parseFloat(dy);
-          } else if (y !== null && lastY !== null) {
-            deltaY = Math.abs(parseFloat(y) - parseFloat(lastY));
-          }
-          if (deltaY !== null && !isNaN(deltaY) && deltaY > 0) {
-            // Ignore massive jumps (e.g. paragraph gaps) so they don't inflate the average line-height
-            if (deltaY < fontSize * 3) {
-              lineHeights.push(deltaY);
-            }
-          }
+           let deltaY = null;
+           if (dy) {
+              if (dy.endsWith('em')) deltaY = parseFloat(dy) * fontSize;
+              else deltaY = parseFloat(dy);
+           } else if (y !== null && lastY !== null) {
+              deltaY = Math.abs(parseFloat(y) - parseFloat(lastY));
+           }
+           if (deltaY !== null && !isNaN(deltaY) && deltaY > 0) {
+              // Ignore massive jumps (e.g. paragraph gaps) so they don't inflate the average line-height
+              if (deltaY < fontSize * 3) {
+                 lineHeights.push(deltaY);
+              }
+           }
         }
-
+        
         if (isNewLine) {
           linesData.push(currentLineTspans);
           currentLineTspans = [];
@@ -5645,19 +5936,19 @@ const MainEditor = ({
         let maxX = -Infinity;
         let textContent = '';
         lineTspans.forEach(t => {
-          try {
-            const x = parseFloat(t.getAttribute('x'));
-            if (!isNaN(x)) {
-              const w = t.getComputedTextLength ? t.getComputedTextLength() : t.textContent.length * (fontSize * 0.5);
-              minX = Math.min(minX, x);
-              maxX = Math.max(maxX, x + w);
-            } else {
-              const b = t.getBBox();
-              minX = Math.min(minX, b.x);
-              maxX = Math.max(maxX, b.x + b.width);
-            }
-          } catch (e) { }
-          textContent += t.textContent;
+           try {
+             const x = parseFloat(t.getAttribute('x'));
+             if (!isNaN(x)) {
+               const w = t.getComputedTextLength ? t.getComputedTextLength() : t.textContent.length * (fontSize * 0.5);
+               minX = Math.min(minX, x);
+               maxX = Math.max(maxX, x + w);
+             } else {
+               const b = t.getBBox();
+               minX = Math.min(minX, b.x);
+               maxX = Math.max(maxX, b.x + b.width);
+             }
+           } catch(e) {}
+           textContent += t.textContent;
         });
         return { minX, maxX, textContent };
       });
@@ -5669,56 +5960,56 @@ const MainEditor = ({
       // Chrome's getBBox() often incorrectly includes trailing whitespace or newlines, inflating the width.
       // We override it here with the exact calculated mathematical bounds of the ink to ensure perfect wrapping.
       if (validBounds.length > 0) {
-        const trueWidth = globalMaxX - globalMinX;
-        fo.setAttribute('x', globalMinX);
-        fo.setAttribute('width', Math.max(trueWidth, 10) + 0.5);
+          const trueWidth = globalMaxX - globalMinX;
+          fo.setAttribute('x', globalMinX);
+          fo.setAttribute('width', Math.max(trueWidth, 10) + 0.5);
       }
-
+      
       let detectedAlign = 'left';
       if (validBounds.length > 1) {
-        let leftMatchCount = 0;
-        let rightMatchCount = 0;
-        let centerMatchCount = 0;
-        const tolerance = fontSize * 0.8;
+         let leftMatchCount = 0;
+         let rightMatchCount = 0;
+         let centerMatchCount = 0;
+         const tolerance = fontSize * 0.8;
+         
+         validBounds.forEach(l => {
+            if (Math.abs(l.minX - globalMinX) < tolerance) leftMatchCount++;
+            if (Math.abs(globalMaxX - l.maxX) < tolerance) rightMatchCount++;
+            const mid = (l.minX + l.maxX) / 2;
+            const gMid = (globalMinX + globalMaxX) / 2;
+            if (Math.abs(mid - gMid) < tolerance) centerMatchCount++;
+         });
+         
+         const thresh = Math.max(1, validBounds.length * 0.8);
+         
+         if (centerMatchCount >= thresh) {
+            detectedAlign = 'center';
+         } else if (rightMatchCount >= thresh && leftMatchCount < thresh) {
+            detectedAlign = 'right';
+         } else if (leftMatchCount >= thresh && validBounds.length > 1) {
+            // Strict justify detection: All "full lines" must perfectly hit the right edge
+            let fullLineCount = 0;
+            let justifiedFullLineCount = 0;
+            const strictTolerance = 3; // 3 pixels max deviation for a true justified edge
+            
+            validBounds.forEach((l, idx) => {
+               const isLastInParagraph = (idx === validBounds.length - 1) || (l.maxX < globalMaxX - (fontSize * 2.0));
+               if (!isLastInParagraph) {
+                   fullLineCount++;
+                   if (Math.abs(globalMaxX - l.maxX) <= strictTolerance) {
+                       justifiedFullLineCount++;
+                   }
+               }
+            });
 
-        validBounds.forEach(l => {
-          if (Math.abs(l.minX - globalMinX) < tolerance) leftMatchCount++;
-          if (Math.abs(globalMaxX - l.maxX) < tolerance) rightMatchCount++;
-          const mid = (l.minX + l.maxX) / 2;
-          const gMid = (globalMinX + globalMaxX) / 2;
-          if (Math.abs(mid - gMid) < tolerance) centerMatchCount++;
-        });
-
-        const thresh = Math.max(1, validBounds.length * 0.8);
-
-        if (centerMatchCount >= thresh) {
-          detectedAlign = 'center';
-        } else if (rightMatchCount >= thresh && leftMatchCount < thresh) {
-          detectedAlign = 'right';
-        } else if (leftMatchCount >= thresh && validBounds.length > 1) {
-          // Strict justify detection: All "full lines" must perfectly hit the right edge
-          let fullLineCount = 0;
-          let justifiedFullLineCount = 0;
-          const strictTolerance = 3; // 3 pixels max deviation for a true justified edge
-
-          validBounds.forEach((l, idx) => {
-            const isLastInParagraph = (idx === validBounds.length - 1) || (l.maxX < globalMaxX - (fontSize * 2.0));
-            if (!isLastInParagraph) {
-              fullLineCount++;
-              if (Math.abs(globalMaxX - l.maxX) <= strictTolerance) {
-                justifiedFullLineCount++;
-              }
+            if (fullLineCount > 0 && justifiedFullLineCount >= fullLineCount * 0.9) {
+                detectedAlign = 'justify';
+            } else {
+                detectedAlign = 'left';
             }
-          });
-
-          if (fullLineCount > 0 && justifiedFullLineCount >= fullLineCount * 0.9) {
-            detectedAlign = 'justify';
-          } else {
+         } else {
             detectedAlign = 'left';
-          }
-        } else {
-          detectedAlign = 'left';
-        }
+         }
       }
 
       // Paragraph reconstruction
@@ -5751,19 +6042,19 @@ const MainEditor = ({
 
       const textAnchor = el.getAttribute('text-anchor');
       const textAlignStyle = el.style.textAlign;
-
+      
       // Use visual detection as primary truth for paragraphs, since exporters 
       // often just use text-anchor="start" and manually position lines.
-      let finalAlign = detectedAlign;
-
+      let finalAlign = detectedAlign; 
+      
       if (textAlignStyle && ['left', 'center', 'right', 'justify'].includes(textAlignStyle)) {
-        finalAlign = textAlignStyle;
+          finalAlign = textAlignStyle;
       } else if (textAnchor === 'middle') {
-        finalAlign = 'center';
+          finalAlign = 'center';
       } else if (textAnchor === 'end') {
-        finalAlign = 'right';
+          finalAlign = 'right';
       }
-
+      
       div.style.textAlign = finalAlign;
 
     } else {
@@ -5816,7 +6107,7 @@ const MainEditor = ({
         const fo = convertTextToForeignObject(el);
         if (fo) {
           el.replaceWith(fo);
-
+          
           // Auto-snap height to perfectly fit the HTML text
           requestAnimationFrame(() => {
             const div = fo.firstElementChild;
@@ -5827,11 +6118,11 @@ const MainEditor = ({
               if (ch > 0 && Math.abs(ch - currentH) > 2) {
                 fo.setAttribute('height', ch);
               }
-
+              
               // Force interact.js/overlays to redraw bounds
               const event = new Event('resize');
               window.dispatchEvent(event);
-
+              
               // Explicitly redraw the highlight now that the FO has painted
               drawOverlayHighlight(fo, 'selected');
             }
@@ -5865,13 +6156,13 @@ const MainEditor = ({
       if (!fo) return;
       textEl.replaceWith(fo);
       foTarget = fo;
-
+      
       // Explicitly redraw the highlight now that the FO is in the DOM
       requestAnimationFrame(() => {
         const highlightType = document.querySelector(`[id="overlay-poly-child-selected-${foTarget.id}"]`) ? 'child-selected' : 'selected';
         drawOverlayHighlight(foTarget, highlightType);
       });
-
+      
       // Update selection to reflect new FO id (same as original text id)
       if (setSelectedLayerId) setSelectedLayerId(fo.id);
       selectedLayerIdRef.current = fo.id;
@@ -5921,9 +6212,9 @@ const MainEditor = ({
         // Temporarily allow height to shrink to measure true text height
         div.style.setProperty('height', 'auto', 'important');
         div.style.setProperty('min-height', '0px', 'important');
-
+        
         const contentH = div.scrollHeight;
-
+        
         div.style.setProperty('height', oldHeight || '100%', 'important');
         div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
 
@@ -5931,15 +6222,28 @@ const MainEditor = ({
 
         let changed = false;
         if (Math.abs(contentH - foH) > 2) {
-          foTarget.setAttribute('height', contentH + 4);
-          changed = true;
+           foTarget.setAttribute('height', contentH + 4);
+           changed = true;
         }
-
+        
         if (changed) {
           const highlightType = document.querySelector(`[id="overlay-poly-child-selected-${foTarget.id}"]`) ? 'child-selected' : 'selected';
-          drawOverlayHighlight(foTarget, highlightType);
-          clearOverlayType('hover');
-          clearOverlayType('child-hover');
+          setTimeout(() => {
+            const container = foTarget.closest('.page-svg-container');
+            if (container) {
+              const pageIdx = container.getAttribute('data-page-index');
+              const overlay = document.getElementById(`highlight-overlay-${pageIdx}`);
+              if (overlay) {
+                const oldSel = overlay.querySelector(`[id="overlay-poly-selected-${foTarget.id}"]`);
+                if (oldSel) oldSel.remove();
+                const oldChildSel = overlay.querySelector(`[id="overlay-poly-child-selected-${foTarget.id}"]`);
+                if (oldChildSel) oldChildSel.remove();
+              }
+            }
+            drawOverlayHighlight(foTarget, highlightType);
+            clearOverlayType('hover');
+            clearOverlayType('child-hover');
+          }, 0);
         }
       }
     };
@@ -5960,7 +6264,7 @@ const MainEditor = ({
             sel.addRange(clickRange);
             placed = true;
           }
-          // Firefox
+        // Firefox
         } else if (document.caretPositionFromPoint) {
           const pos = document.caretPositionFromPoint(cx, cy);
           if (pos) {
@@ -6017,6 +6321,9 @@ const MainEditor = ({
     };
 
     const handleBlur = () => {
+      suppressClickRef.current = true;
+      setTimeout(() => { suppressClickRef.current = false; }, 200);
+
       const finalContent = div.innerText || '';
 
       if (finalContent.trim().length === 0) {
@@ -6041,18 +6348,18 @@ const MainEditor = ({
         const oldWidth = div.style.width;
         const oldHeight = div.style.height;
         const oldMinHeight = div.style.minHeight;
-
+        
         if (isAutoWrap) {
-          div.style.width = 'max-content';
+           div.style.width = 'max-content';
         }
-
+        
         // Temporarily allow height to shrink to measure true text height
         div.style.setProperty('height', 'auto', 'important');
         div.style.setProperty('min-height', '0px', 'important');
-
+        
         const contentW = div.scrollWidth;
         const contentH = div.scrollHeight;
-
+        
         div.style.width = oldWidth;
         div.style.setProperty('height', oldHeight || '100%', 'important');
         div.style.setProperty('min-height', oldMinHeight || '100%', 'important');
@@ -6062,18 +6369,18 @@ const MainEditor = ({
         const currentX = parseFloat(foTarget.getAttribute('x')) || 0;
 
         if (isAutoWrap && Math.abs(contentW - currentW) > 2) {
-          const widthDiff = contentW - currentW;
-          const align = window.getComputedStyle(div).textAlign;
-          foTarget.setAttribute('width', Math.max(contentW, 10));
-          if (align === 'center') {
-            foTarget.setAttribute('x', currentX - (widthDiff / 2));
-          } else if (align === 'right' || align === 'end') {
-            foTarget.setAttribute('x', currentX - widthDiff);
-          }
+           const widthDiff = contentW - currentW;
+           const align = window.getComputedStyle(div).textAlign;
+           foTarget.setAttribute('width', Math.max(contentW, 10));
+           if (align === 'center') {
+             foTarget.setAttribute('x', currentX - (widthDiff / 2));
+           } else if (align === 'right' || align === 'end') {
+             foTarget.setAttribute('x', currentX - widthDiff);
+           }
         }
-
+        
         if (Math.abs(contentH - currentH) > 2) {
-          foTarget.setAttribute('height', contentH + 4);
+           foTarget.setAttribute('height', contentH + 4);
         }
       }
 
@@ -6126,10 +6433,10 @@ const MainEditor = ({
     const dx = e.clientX - (lastClickRef.current.x || 0);
     const dy = e.clientY - (lastClickRef.current.y || 0);
     const distance = Math.hypot(dx, dy);
-
+    
     // A double click must happen within 500ms AND the mouse must not have moved more than 10 pixels
     const isDoubleClick = timeSinceLast > 0 && timeSinceLast < 500 && distance < 10;
-
+    
     lastClickRef.current = { time: now, target: e.target, x: e.clientX, y: e.clientY };
 
     if (isDoubleClick) {
@@ -6196,8 +6503,26 @@ const MainEditor = ({
     clearOverlayType('child-hover');
 
     // ── Pre-empt polygon clicks (hit area padding) ─────────────────────────────
+    let hitMultiSelectionGap = false;
+    const currentMultiIds = multiSelectedIdsRef.current;
+    if (currentMultiIds.size > 1) {
+       const multiPoly = container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi-selection-bounds') || container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi');
+       if (multiPoly) {
+          const polyRect = multiPoly.getBoundingClientRect();
+          if (e.clientX >= polyRect.left && e.clientX <= polyRect.right &&
+              e.clientY >= polyRect.top && e.clientY <= polyRect.bottom) {
+             hitMultiSelectionGap = true;
+          }
+       }
+    }
+
     if (e.target.tagName.toLowerCase() === 'polygon' && e.target.id?.includes('overlay-poly-')) {
       const polySelectionId = e.target.id.replace('overlay-poly-selected-', '').replace('overlay-poly-child-selected-', '').replace('overlay-poly-hover-', '');
+      
+      if (polySelectionId === 'multi') {
+        return;
+      }
+
       if (polySelectionId) {
         if (e.shiftKey && !e.ctrlKey) {
           const currentSet = new Set(multiSelectedIdsRef.current);
@@ -6476,12 +6801,14 @@ const MainEditor = ({
             if (isPopupEditor && topFrames.length > 0) {
               setSingleSelection(topFrames[0].id);
             } else {
+              if (hitMultiSelectionGap) return; // Keep multi-selection intact!
               setSingleSelection(null);
               setCurrentFrameId(null);
               currentFrameIdRef.current = null;
             }
           } else {
             // ── Deeper Frame Gap: exit one level (select frame, keep entered)
+            if (hitMultiSelectionGap) return; // Keep multi-selection intact!
             setSingleSelection(frameId);
             // Don't null currentFrameId here to keep context
           }
@@ -6510,6 +6837,7 @@ const MainEditor = ({
           currentFrameIdRef.current = hitTopFrame.id;
         } else {
           // Hit nothing? Deselect everything
+          if (hitMultiSelectionGap) return; // Keep multi-selection intact!
           if (isPopupEditor && topLevelEls.length > 0) {
             setSingleSelection(topLevelEls[0].id);
           } else {
@@ -6629,6 +6957,18 @@ const MainEditor = ({
       const activeSel = selectedLayerIdRef.current ? svg.querySelector(`[id="${selectedLayerIdRef.current}"]`) : null;
       if (activeSel && hitTest(activeSel, e.clientX, e.clientY, 15)) {
         return; // Keep selection intact!
+      }
+
+      // ── MULTI-SELECTION GAP CLICK CHECK ──
+      if (multiSelectedIdsRef.current.size > 1) {
+         const multiPoly = container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi-selection-bounds') || container?.querySelector('.selection-overlay-layer #overlay-poly-selected-multi');
+         if (multiPoly) {
+            const rect = multiPoly.getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom) {
+               return; // Keep multi-selection intact!
+            }
+         }
       }
 
       if (isPopupEditor && topLevelEls.length > 0) {
@@ -6816,12 +7156,12 @@ const MainEditor = ({
         const p2 = new DOMPoint(rect.right, rect.bottom).matrixTransform(ctm);
         const p3 = new DOMPoint(rect.left, rect.bottom).matrixTransform(ctm);
         const p4 = new DOMPoint(rect.right, rect.top).matrixTransform(ctm);
-
+        
         const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
         const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
         const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
         const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
-
+        
         return {
           minX, maxX, minY, maxY,
           width: maxX - minX,
@@ -6842,7 +7182,7 @@ const MainEditor = ({
       const el = elements[0];
       const parent = el.parentNode;
       let parentBBox = null;
-
+      
       if (parent && parent.tagName && parent.tagName.toLowerCase() === 'g' && parent !== svg) {
         parentBBox = getElBBox(parent);
       }
@@ -6852,7 +7192,7 @@ const MainEditor = ({
       } else {
         const viewBox = svg.getAttribute('viewBox');
         const [vx, vy, vw, vh] = viewBox ? viewBox.split(' ').map(Number) : [0, 0, 595, 842];
-        targetBBox = { minX: vx, minY: vy, maxX: vx + vw, maxY: vy + vh, midX: vx + vw / 2, midY: vy + vh / 2 };
+        targetBBox = { minX: vx, minY: vy, maxX: vx + vw, maxY: vy + vh, midX: vx + vw/2, midY: vy + vh/2 };
       }
     } else {
       targetBBox = {
@@ -6864,7 +7204,7 @@ const MainEditor = ({
       targetBBox.midX = (targetBBox.minX + targetBBox.maxX) / 2;
       targetBBox.midY = (targetBBox.minY + targetBBox.maxY) / 2;
     }
-
+    
     const applyTranslation = (el, dx, dy) => {
       if (dx === 0 && dy === 0) return;
       try {
@@ -6873,45 +7213,71 @@ const MainEditor = ({
         const parentScreenCTM = el.parentNode.getScreenCTM();
         const parentToUserCTM = svgCTMInv.multiply(parentScreenCTM);
         const invParentCTM = parentToUserCTM.inverse();
-
+        
         const p0 = new DOMPoint(0, 0).matrixTransform(invParentCTM);
         const p1 = new DOMPoint(dx, dy).matrixTransform(invParentCTM);
         const localDx = p1.x - p0.x;
         const localDy = p1.y - p0.y;
+        
+        const tag = el.tagName.toLowerCase();
+        const isText = tag === 'text' || el.getAttribute('data-type') === 'text';
+        const hasTransform = el.getAttribute('transform');
 
-        const matrix = typeof getElementMatrix === 'function' ? getElementMatrix(el) : new DOMMatrix(el.getAttribute('transform') || '');
-        const nextMatrix = new DOMMatrix().translate(localDx, localDy).multiply(matrix);
-        if (typeof matrixToTransform === 'function') el.setAttribute('transform', matrixToTransform(nextMatrix));
+        if (isText || (hasTransform && hasTransform !== 'matrix(1 0 0 1 0 0)')) {
+          const matrix = typeof getElementMatrix === 'function' ? getElementMatrix(el) : new DOMMatrix(el.getAttribute('transform') || '');
+          const nextMatrix = new DOMMatrix().translate(localDx, localDy).multiply(matrix);
+          if (typeof matrixToTransform === 'function') el.setAttribute('transform', matrixToTransform(nextMatrix));
+        } else {
+          if (tag === 'rect' || tag === 'foreignobject' || tag === 'image') {
+            const currentX = parseFloat(el.getAttribute('x')) || 0;
+            const currentY = parseFloat(el.getAttribute('y')) || 0;
+            el.setAttribute('x', currentX + localDx);
+            el.setAttribute('y', currentY + localDy);
+          } else if (tag === 'circle' || tag === 'ellipse') {
+            const currentCx = parseFloat(el.getAttribute('cx')) || 0;
+            const currentCy = parseFloat(el.getAttribute('cy')) || 0;
+            el.setAttribute('cx', currentCx + localDx);
+            el.setAttribute('cy', currentCy + localDy);
+          } else {
+            const matrix = typeof getElementMatrix === 'function' ? getElementMatrix(el) : new DOMMatrix(el.getAttribute('transform') || '');
+            const nextMatrix = new DOMMatrix().translate(localDx, localDy).multiply(matrix);
+            if (typeof matrixToTransform === 'function') el.setAttribute('transform', matrixToTransform(nextMatrix));
+          }
+        }
       } catch (e) { }
     };
 
     if (type === 'distribute-h' && elBBoxes.length > 2) {
-      elBBoxes.sort((a, b) => a.bbox.midX - b.bbox.midX);
+      elBBoxes.sort((a, b) => a.bbox.minX - b.bbox.minX);
       const first = elBBoxes[0];
       const last = elBBoxes[elBBoxes.length - 1];
-      const totalDistance = last.bbox.midX - first.bbox.midX;
-      const gap = totalDistance / (elBBoxes.length - 1);
-
-      let currentMidX = first.bbox.midX + gap;
+      
+      const totalWidth = last.bbox.maxX - first.bbox.minX;
+      const sumOfWidths = elBBoxes.reduce((sum, item) => sum + item.bbox.width, 0);
+      const gap = (totalWidth - sumOfWidths) / (elBBoxes.length - 1);
+      
+      let currentX = first.bbox.minX + first.bbox.width + gap;
       for (let i = 1; i < elBBoxes.length - 1; i++) {
         const item = elBBoxes[i];
-        const dx = currentMidX - item.bbox.midX;
+        const dx = currentX - item.bbox.minX;
         applyTranslation(item.el, dx, 0);
-        currentMidX += gap;
+        currentX += item.bbox.width + gap;
       }
     } else if (type === 'distribute-v' && elBBoxes.length > 2) {
-      elBBoxes.sort((a, b) => a.bbox.midY - b.bbox.midY);
+      elBBoxes.sort((a, b) => a.bbox.minY - b.bbox.minY);
       const first = elBBoxes[0];
       const last = elBBoxes[elBBoxes.length - 1];
-      const totalDistance = last.bbox.midY - first.bbox.midY;
-      const gap = totalDistance / (elBBoxes.length - 1);
-
-      let currentMidY = first.bbox.midY + gap;
+      
+      const totalHeight = last.bbox.maxY - first.bbox.minY;
+      const sumOfHeights = elBBoxes.reduce((sum, item) => sum + item.bbox.height, 0);
+      const gap = (totalHeight - sumOfHeights) / (elBBoxes.length - 1);
+      
+      let currentY = first.bbox.minY + first.bbox.height + gap;
       for (let i = 1; i < elBBoxes.length - 1; i++) {
         const item = elBBoxes[i];
-        const dy = currentMidY - item.bbox.midY;
+        const dy = currentY - item.bbox.minY;
         applyTranslation(item.el, 0, dy);
-        currentMidY += gap;
+        currentY += item.bbox.height + gap;
       }
     } else {
       elBBoxes.forEach(({ el, bbox }) => {
@@ -6929,6 +7295,14 @@ const MainEditor = ({
     }
 
     if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+
+    // Update selection highlight after aligning elements so the blue box immediately snaps to the new positions
+    if (multiSelectedIdsRef.current && multiSelectedIdsRef.current.size > 1) {
+      drawMultiSelectionHighlight(multiSelectedIdsRef.current, 'selected');
+    } else if (selectedLayerId) {
+      const el = document.getElementById(selectedLayerId);
+      if (el) drawOverlayHighlight(el, 'selected');
+    }
   };
 
   return (
@@ -6977,6 +7351,12 @@ const MainEditor = ({
         ref={editorContainerRef}
         className={`flex-1 relative flex items-center justify-center p-[1vw] overflow-hidden ${isPopupEditor ? 'bg-transparent' : 'bg-[#FBFBFB]'}`}
         style={{ cursor: isSpaceDown ? (isPanningRef.current ? 'grabbing' : 'grab') : 'default' }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('show-layer-context-menu', {
+            detail: { e, layerId: 'outside-background', pageIndex: activePageIndex, isOverlay: true }
+          }));
+        }}
         onMouseDown={(e) => {
           if (isSpaceDownRef.current) {
             e.preventDefault();
@@ -7028,6 +7408,7 @@ const MainEditor = ({
             if (zoomContainerRef.current) {
               zoomContainerRef.current.style.transform = `translate(${boundedX}px, ${boundedY}px) scale(${currentScale})`;
             }
+            window.dispatchEvent(new CustomEvent('editor-pan-update', { detail: { x: boundedX, y: boundedY } }));
           }
         }}
         onMouseUp={(e) => {
@@ -7073,9 +7454,45 @@ const MainEditor = ({
           <div className="absolute inset-0 z-[9999]" style={{ cursor: isPanningRef.current ? 'grabbing' : 'grab' }} />
         )}
 
+        {/* Canvas Ruler */}
+        {isRulerEnabled && (
+          <CanvasRuler
+            zoom={zoom}
+            pan={currentPanRef.current}
+            baseCanvasWidth={(() => {
+              const spreadStartIndex = (isDoublePage && activePageIndex > 0)
+                ? (activePageIndex % 2 === 0 ? activePageIndex - 1 : activePageIndex)
+                : activePageIndex;
+              const currentSpread = isDoublePage && spreadStartIndex > 0 && spreadStartIndex + 1 < pages.length;
+              const baseVhHeight = window.innerHeight * 0.78;
+              const totalWidth = currentSpread ? 2 * baseWidth : baseWidth;
+              return baseVhHeight * (totalWidth / baseHeight);
+            })()}
+            baseCanvasHeight={window.innerHeight * 0.78}
+          />
+        )}
+        
+        {/* Guides Overlay */}
+        {isRulerEnabled && (
+          <GuidesOverlay
+            zoom={zoom}
+            pan={currentPanRef.current}
+            baseCanvasWidth={(() => {
+              const spreadStartIndex = (isDoublePage && activePageIndex > 0)
+                ? (activePageIndex % 2 === 0 ? activePageIndex - 1 : activePageIndex)
+                : activePageIndex;
+              const currentSpread = isDoublePage && spreadStartIndex > 0 && spreadStartIndex + 1 < pages.length;
+              const baseVhHeight = window.innerHeight * 0.78;
+              const totalWidth = currentSpread ? 2 * baseWidth : baseWidth;
+              return baseVhHeight * (totalWidth / baseHeight);
+            })()}
+            baseCanvasHeight={window.innerHeight * 0.78}
+          />
+        )}
+
         {/* Top Group: Selection & Primary Tools - Independent Position */}
         {!isPdfProject && !isPopupEditor && (
-          <div className="absolute right-[1.05vw] top-[1.9vh] z-50">
+          <div className="absolute right-[1.05vw] top-[6vh] z-50">
             <div className="bg-[#F1F3F4] rounded-[0.5vw] border border-gray-300 p-[0.3vw] flex flex-col items-center w-[2.7vw] gap-[0.7vh] shadow-sm">
               {/* Black Edit Icon Button */}
               <button
@@ -7104,47 +7521,9 @@ const MainEditor = ({
           </div>
         )}
 
-        {/* Top-Left: Animated Lordicon Card - Vertical Column */}
-        {!isPdfProject && (
-          <div className="absolute left-[0.8vw] top-[0.8vw] z-50">
-            <div className="bg-white rounded-[0.5vw] border border-gray-100/50 p-[0.3vw] shadow-sm flex flex-col items-center gap-[0.5vw]">
-              {/* Animated Hotspot Icon */}
-              <div className="group cursor-pointer w-[1.8vw] h-[1.8vw] flex items-center justify-center hover:bg-[#F3F4F6] rounded-[0.3vw] transition-colors">
-                <lord-icon
-                  src="https://cdn.lordicon.com/erxuunyq.json"
-                  trigger="loop"
-                  colors="primary:#E88F23"
-                  style={{ width: '1.4vw', height: '1.4vw' }}
-                ></lord-icon>
-              </div>
-
-              {/* Animated Notification/Follow Icon */}
-              <div className="group cursor-pointer w-[1.8vw] h-[1.8vw] flex items-center justify-center hover:bg-[#F3F4F6] rounded-[0.3vw] transition-colors">
-                <lord-icon
-                  src="https://cdn.lordicon.com/kwnsnjyg.json"
-                  trigger="loop"
-                  colors="primary:#00ACEE"
-                  style={{ width: '1.4vw', height: '1.4vw' }}
-                ></lord-icon>
-              </div>
-
-              {/* Animated Third Icon */}
-              <div className="group cursor-pointer w-[1.8vw] h-[1.8vw] flex items-center justify-center hover:bg-[#F3F4F6] rounded-[0.3vw] transition-colors">
-                <lord-icon
-                  src="https://cdn.lordicon.com/shquqxad.json"
-                  trigger="loop"
-                  delay="2000"
-                  colors="primary:#9381FF"
-                  style={{ width: '1.4vw', height: '1.4vw' }}
-                ></lord-icon>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Floating Menu Button (Top Right Edge for Popup Editor) */}
         {!isPdfProject && isPopupEditor && activeTopTool !== 'animation' && activeTopTool !== 'interaction' && (
-          <div className="absolute right-0 top-[2.5vh] z-50">
+          <div className="absolute right-0 top-[6.5vh] z-50">
             <div className="bg-[#F1F3F4] rounded-l-[0.8vw] border-y border-l border-gray-300 p-[0.3vw] flex flex-col shadow-sm relative">
               {/* Perfect Inverted Corner Top */}
               <div className="absolute -top-[0.8vw] right-0 w-[0.8vw] h-[0.8vw] border-gray-300 pointer-events-none">
@@ -7213,7 +7592,7 @@ const MainEditor = ({
 
         {/* Bottom Group: Creation & Widgets - HIDDEN for PDF projects */}
         {!isPdfProject && activeTopTool === 'editor' && (
-          <div className="absolute right-0 top-[20vh] z-50">
+          <div className="absolute right-0 top-[25vh] z-50">
             <div className="bg-[#F1F3F4] rounded-l-[0.8vw] border-y border-l border-gray-300 p-[0.3vw] flex flex-col shadow-sm relative">
 
               {/* Perfect Inverted Corner Top */}
@@ -7579,81 +7958,7 @@ const MainEditor = ({
             {pages.length > 0 && (isDoublePage ? (spreadStartIndex > 0 && pages[spreadStartIndex]) : pages[activePageIndex]) && (
 
               <div className="relative group/page">
-                {/* Page Control Button (Floating Above Top) */}
-                {!isPdfProject && !isPopupEditor && activeTopTool !== 'animation' && activeTopTool !== 'interaction' && ((isDoublePage ? spreadStartIndex : activePageIndex) === activePageIndex) && (
-                  <div className="absolute top-[-2.5vw] z-30" style={{ [isCurrentlySpread ? 'left' : 'right']: '0vw' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const displayIdx = isDoublePage ? spreadStartIndex : activePageIndex;
-                        setOpenMenuIndex(openMenuIndex === displayIdx ? null : displayIdx);
-                      }}
-
-                      className={`cursor-pointer rounded-[0.5vw] bg-[#F3F4F6] transition-all duration-300 flex items-center justify-center w-[2vw] h-[2vw] shadow-sm hover:bg-gray-200`}
-                    >
-                      <Icon icon="ci:hamburger-md" width="1.2vw" height="1.2vw" className="text-[#111827]" />
-                    </button>
-
-                    <AnimatePresence>
-                      {(() => {
-                        const displayIdx = isDoublePage ? spreadStartIndex : activePageIndex;
-                        return openMenuIndex === displayIdx && (
-
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="absolute top-full mt-[0.5vw] left-0 w-[12vw] bg-white rounded-[0.8vw] shadow-xl border border-gray-100 p-[0.5vw] z-[9999] flex flex-col gap-[0.2vw]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<PlusIcon />}
-                                label="Add Page"
-                                onClick={() => { insertPageAfter(activePageIndex); setOpenMenuIndex(null); }}
-                              />
-                            )}
-                            <MenuOption
-                              icon={<FilePlusIcon />}
-                              label="Add File"
-                              onClick={() => { onAddFile && onAddFile(activePageIndex); setOpenMenuIndex(null); }}
-                            />
-                            <MenuOption
-                              icon={<DuplicateIcon />}
-                              label="Duplicate"
-                              onClick={() => { duplicatePage(activePageIndex); setOpenMenuIndex(null); }}
-                            />
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<TemplateIcon />}
-                                label="Template"
-                                onClick={() => {
-                                  onOpenTemplateModal(activePageIndex);
-                                  setOpenMenuIndex(null);
-                                }}
-                              />
-                            )}
-                            <div className="h-[0.1vw] bg-gray-100 my-[0.2vw] mx-[0.4vw]" />
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<ClearIcon />}
-                                label="Clear"
-                                onClick={() => { clearPage(activePageIndex); setOpenMenuIndex(null); }}
-                              />
-                            )}
-                            <MenuOption
-                              icon={<DeleteIcon />}
-                              label="Delete"
-                              color="text-red-500"
-                              hoverColor="hover:bg-red-50"
-                              onClick={() => { deletePage(activePageIndex); setOpenMenuIndex(null); }}
-                            />
-                          </motion.div>
-                        );
-                      })()}
-                    </AnimatePresence>
-                  </div>
-                )}
+                {/* Page Control Button (Floating Above Top) Removed as per user request */}
 
                 {/* A4 Canvas Page 1 Inner */}
                 <div
@@ -7679,64 +7984,69 @@ const MainEditor = ({
                       const isPenToolActive = activeMainTool === 'pen' && displayIndex === activePageIndex;
                       const isTypeActive = activeMainTool === 'type' && displayIndex === activePageIndex;
 
-                      return pages[displayIndex]?.html ? (
+                      const pageHtml = pages[displayIndex]?.html;
+                      const isPageEmpty = !pageHtml || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0));
+
+                      return (
                         <div
                           className={`absolute inset-0 w-full h-full overflow-visible flex items-center justify-center ${isPopupEditor ? 'bg-transparent' : 'bg-white'}`}
                           style={{ cursor: (isPencilActive ? PENCIL_CURSOR : (isPenToolActive ? PEN_CURSOR : (isShapeActive ? SHAPE_CURSOR : (isTypeActive ? TYPE_CURSOR : 'default')))) }}
                         >
-                          <div
-                            id={`canvas-content-${displayIndex}`}
-                            className="w-full h-full flex items-center justify-center"
+                          {pageHtml && (
+                            <div
+                              id={`canvas-content-${displayIndex}`}
+                              className="w-full h-full flex items-center justify-center"
                             ref={(el) => {
-                              if (el) {
-                                const newHtml = getHtmlToRender(displayIndex, pages[displayIndex]?.html);
-                                if (window.__skipCanvasUpdateForPage === displayIndex) {
-                                  window.__skipCanvasUpdateForPage = -1;
-                                  el.__lastHtml = newHtml;
-                                } else if (el.__lastHtml !== newHtml) {
-                                  const videos = Array.from(el.querySelectorAll('video'));
-                                  const videoStates = videos.map(v => ({
-                                    id: v.id || v.closest('[id]')?.id,
-                                    node: v
-                                  }));
-
-                                  let safeBin = document.getElementById('video-safe-bin');
-                                  if (!safeBin) {
-                                    safeBin = document.createElement('div');
-                                    safeBin.id = 'video-safe-bin';
-                                    safeBin.style.display = 'none';
-                                    document.body.appendChild(safeBin);
-                                  }
-                                  videoStates.forEach(state => safeBin.appendChild(state.node));
-
-                                  el.innerHTML = newHtml;
-
-                                  videoStates.forEach(state => {
-                                    if (!state.id) return;
-                                    const newContainer = el.querySelector(`[id="${state.id}"]`);
-                                    if (newContainer) {
-                                      const newVideo = newContainer.querySelector('video');
-                                      if (newVideo && newVideo.parentNode) {
-                                        Array.from(newVideo.attributes).forEach(attr => {
-                                          if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
-                                            state.node.setAttribute(attr.name, attr.value);
-                                          }
-                                        });
-                                        newVideo.parentNode.replaceChild(state.node, newVideo);
+                                if (el) {
+                                  const newHtml = getHtmlToRender(displayIndex, pages[displayIndex]?.html);
+                                  if (window.__skipCanvasUpdateForPage === displayIndex) {
+                                      window.__skipCanvasUpdateForPage = -1;
+                                      el.__lastHtml = newHtml;
+                                  } else if (el.__lastHtml !== newHtml) {
+                                      const videos = Array.from(el.querySelectorAll('video'));
+                                      const videoStates = videos.map(v => ({
+                                          id: v.id || v.closest('[id]')?.id,
+                                          node: v
+                                      }));
+                                      
+                                      let safeBin = document.getElementById('video-safe-bin');
+                                      if (!safeBin) {
+                                        safeBin = document.createElement('div');
+                                        safeBin.id = 'video-safe-bin';
+                                        safeBin.style.display = 'none';
+                                        document.body.appendChild(safeBin);
                                       }
-                                    }
-                                  });
-                                  el.__lastHtml = newHtml;
+                                      videoStates.forEach(state => safeBin.appendChild(state.node));
+
+                                      el.innerHTML = newHtml;
+                                      
+                                      videoStates.forEach(state => {
+                                          if (!state.id) return;
+                                          const newContainer = el.querySelector(`[id="${state.id}"]`);
+                                          if (newContainer) {
+                                              const newVideo = newContainer.querySelector('video');
+                                              if (newVideo && newVideo.parentNode) {
+                                                  Array.from(newVideo.attributes).forEach(attr => {
+                                                      if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
+                                                          state.node.setAttribute(attr.name, attr.value);
+                                                      }
+                                                  });
+                                                  newVideo.parentNode.replaceChild(state.node, newVideo);
+                                              }
+                                          }
+                                      });
+                                      el.__lastHtml = newHtml;
+                                  }
                                 }
-                              }
                             }}
                             onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
                             onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
                             onMouseLeave={handleSvgMouseLeave}
                             onClick={handleSvgClick}
                             // onDoubleClick={handleSvgDoubleClick} // replaced by manual detection in handleSvgClick
-                            onContextMenu={(e) => handleSvgContextMenu(displayIndex, e)}
-                          />
+                              onContextMenu={(e) => handleSvgContextMenu(displayIndex, e)}
+                            />
+                          )}
                           {/* Selection Overlay (Overlay rotated element perfectly) */}
                           <svg
                             id={`highlight-overlay-${displayIndex}`}
@@ -7777,27 +8087,30 @@ const MainEditor = ({
                               display: 'none'
                             }}
                           />
-                        </div>
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                          <span className="text-[1.1vw] text-gray-300 font-medium mb-[0.4vw]">Base sheet ({baseWidth.toFixed(2)} x {baseHeight.toFixed(2)} mm)</span>
-                          {displayIndex === activePageIndex && (
-                            <span className="text-[1.5vw] text-gray-300 font-medium">Choose Templets to Edit page</span>
+
+                          {isPageEmpty && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none bg-transparent opacity-60">
+                              <div className="text-center text-[#B0B5C1] text-[0.85vw] font-normal leading-snug mb-[0.8vw]">
+                                Ready-made templates<br />are available for a quicker start
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                   e.stopPropagation();
+                                   onOpenTemplateModal(displayIndex);
+                                }}
+                                className="text-[#5145F6] hover:text-[#3B2DD6] text-[0.85vw] font-medium mb-[0.8vw] pointer-events-auto cursor-pointer underline underline-offset-4 decoration-1"
+                              >
+                                Add Templates
+                              </button>
+                              <div className="text-[#B0B5C1] text-[0.85vw] mb-[0.8vw] font-normal">
+                                (or)
+                              </div>
+                              <div className="text-[#D1D5DB] text-[0.85vw] font-normal">
+                                Create your own Design
+                              </div>
+                            </div>
                           )}
                         </div>
-                      );
-                    })()}
-
-
-                    {/* Simple Click-to-Open Gallery Overlay for empty pages */}
-                    {(() => {
-                      const displayIndex = isDoublePage ? spreadStartIndex : activePageIndex;
-                      return !pages[displayIndex]?.html && displayIndex === activePageIndex && (
-                        <div
-                          className="absolute inset-0 z-10"
-                          onClick={() => onOpenTemplateModal(displayIndex)}
-                          onContextMenu={(e) => e.preventDefault()}
-                        />
                       );
                     })()}
 
@@ -7816,81 +8129,7 @@ const MainEditor = ({
             {(activePageIndex === 0 ? (isDoublePage && pages[0]) : isCurrentlySpread) && (
 
               <div className="relative group/page">
-                {/* Page Control Button (Floating Above Top - Right Side) */}
-                {!isPdfProject && !isPopupEditor && activeTopTool !== 'animation' && activeTopTool !== 'interaction' && ((activePageIndex === 0 ? 0 : spreadStartIndex + 1) === activePageIndex) && (
-                  <div className="absolute top-[-2.5vw] right-0 z-30">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const displayIndex = activePageIndex === 0 ? 0 : spreadStartIndex + 1;
-                        setOpenMenuIndex(openMenuIndex === displayIndex ? null : displayIndex);
-                      }}
-
-                      className="cursor-pointer rounded-[0.5vw] bg-[#F3F4F6] transition-all duration-300 flex items-center justify-center w-[2vw] h-[2vw] shadow-sm hover:bg-gray-200"
-                    >
-                      <Icon icon="ci:hamburger-md" width="1.2vw" height="1.2vw" className="text-[#111827]" />
-                    </button>
-
-                    <AnimatePresence>
-                      {(() => {
-                        const displayIndex = activePageIndex === 0 ? 0 : spreadStartIndex + 1;
-                        return openMenuIndex === displayIndex && (
-
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="absolute top-full mt-[0.5vw] right-0 w-[12vw] bg-white rounded-[0.8vw] shadow-xl border border-gray-100 p-[0.5vw] z-[9999] flex flex-col gap-[0.2vw]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<PlusIcon />}
-                                label="Add Page"
-                                onClick={() => { insertPageAfter(displayIndex); setOpenMenuIndex(null); }}
-                              />
-                            )}
-                            <MenuOption
-                              icon={<FilePlusIcon />}
-                              label="Add File"
-                              onClick={() => { onAddFile && onAddFile(displayIndex); setOpenMenuIndex(null); }}
-                            />
-                            <MenuOption
-                              icon={<DuplicateIcon />}
-                              label="Duplicate"
-                              onClick={() => { duplicatePage(displayIndex); setOpenMenuIndex(null); }}
-                            />
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<TemplateIcon />}
-                                label="Template"
-                                onClick={() => {
-                                  onOpenTemplateModal(displayIndex);
-                                  setOpenMenuIndex(null);
-                                }}
-                              />
-                            )}
-                            <div className="h-[0.1vw] bg-gray-100 my-[0.2vw] mx-[0.4vw]" />
-                            {!isPdfProject && (
-                              <MenuOption
-                                icon={<ClearIcon />}
-                                label="Clear"
-                                onClick={() => { clearPage(displayIndex); setOpenMenuIndex(null); }}
-                              />
-                            )}
-                            <MenuOption
-                              icon={<DeleteIcon />}
-                              label="Delete"
-                              color="text-red-500"
-                              hoverColor="hover:bg-red-50"
-                              onClick={() => { deletePage(displayIndex); setOpenMenuIndex(null); }}
-                            />
-                          </motion.div>
-                        );
-                      })()}
-                    </AnimatePresence>
-                  </div>
-                )}
+                {/* Page Control Button (Floating Above Top - Right Side) Removed as per user request */}
 
                 {/* A4 Canvas Page 2 Inner */}
                 <div
@@ -7918,64 +8157,69 @@ const MainEditor = ({
                       const isTypeActive = activeMainTool === 'type' && displayIndex === activePageIndex;
 
 
-                      return page?.html ? (
+                      const pageHtml = page?.html;
+                      const isPageEmpty = !pageHtml || (page?.layers?.length === 1 && (!page.layers[0].children || page.layers[0].children.length === 0));
+
+                      return (
                         <div
                           className={`absolute inset-0 w-full h-full overflow-visible flex items-center justify-center ${isPopupEditor ? 'bg-transparent' : 'bg-white'}`}
                           style={{ cursor: ((activeMainTool === 'pen' && selectedPenTool === 'pencil') ? PENCIL_CURSOR : (isPenToolActive ? PEN_CURSOR : (isShapeActive ? SHAPE_CURSOR : (isTypeActive ? TYPE_CURSOR : 'default')))) }}
                         >
-                          <div
-                            id={`canvas-content-${displayIndex}`}
-                            className="w-full h-full flex items-center justify-center"
-                            ref={(el) => {
-                              if (el) {
-                                const newHtml = getHtmlToRender(displayIndex, page.html);
-                                if (window.__skipCanvasUpdateForPage === displayIndex) {
-                                  window.__skipCanvasUpdateForPage = -1;
-                                  el.__lastHtml = newHtml;
-                                } else if (el.__lastHtml !== newHtml) {
-                                  const videos = Array.from(el.querySelectorAll('video'));
-                                  const videoStates = videos.map(v => ({
-                                    id: v.id || v.closest('[id]')?.id,
-                                    node: v
-                                  }));
-
-                                  let safeBin = document.getElementById('video-safe-bin');
-                                  if (!safeBin) {
-                                    safeBin = document.createElement('div');
-                                    safeBin.id = 'video-safe-bin';
-                                    safeBin.style.display = 'none';
-                                    document.body.appendChild(safeBin);
-                                  }
-                                  videoStates.forEach(state => safeBin.appendChild(state.node));
-
-                                  el.innerHTML = newHtml;
-
-                                  videoStates.forEach(state => {
-                                    if (!state.id) return;
-                                    const newContainer = el.querySelector(`[id="${state.id}"]`);
-                                    if (newContainer) {
-                                      const newVideo = newContainer.querySelector('video');
-                                      if (newVideo && newVideo.parentNode) {
-                                        Array.from(newVideo.attributes).forEach(attr => {
-                                          if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
-                                            state.node.setAttribute(attr.name, attr.value);
-                                          }
-                                        });
-                                        newVideo.parentNode.replaceChild(state.node, newVideo);
+                          {pageHtml && (
+                            <div
+                              id={`canvas-content-${displayIndex}`}
+                              className="w-full h-full flex items-center justify-center"
+                              ref={(el) => {
+                                if (el) {
+                                  const newHtml = getHtmlToRender(displayIndex, page.html);
+                                  if (window.__skipCanvasUpdateForPage === displayIndex) {
+                                      window.__skipCanvasUpdateForPage = -1;
+                                      el.__lastHtml = newHtml;
+                                  } else if (el.__lastHtml !== newHtml) {
+                                      const videos = Array.from(el.querySelectorAll('video'));
+                                      const videoStates = videos.map(v => ({
+                                          id: v.id || v.closest('[id]')?.id,
+                                          node: v
+                                      }));
+                                      
+                                      let safeBin = document.getElementById('video-safe-bin');
+                                      if (!safeBin) {
+                                        safeBin = document.createElement('div');
+                                        safeBin.id = 'video-safe-bin';
+                                        safeBin.style.display = 'none';
+                                        document.body.appendChild(safeBin);
                                       }
-                                    }
-                                  });
-                                  el.__lastHtml = newHtml;
+                                      videoStates.forEach(state => safeBin.appendChild(state.node));
+
+                                      el.innerHTML = newHtml;
+                                      
+                                      videoStates.forEach(state => {
+                                          if (!state.id) return;
+                                          const newContainer = el.querySelector(`[id="${state.id}"]`);
+                                          if (newContainer) {
+                                              const newVideo = newContainer.querySelector('video');
+                                              if (newVideo && newVideo.parentNode) {
+                                                  Array.from(newVideo.attributes).forEach(attr => {
+                                                      if (attr.name !== 'src' || state.node.getAttribute('src') === attr.value) {
+                                                          state.node.setAttribute(attr.name, attr.value);
+                                                      }
+                                                  });
+                                                  newVideo.parentNode.replaceChild(state.node, newVideo);
+                                              }
+                                          }
+                                      });
+                                      el.__lastHtml = newHtml;
+                                  }
                                 }
-                              }
-                            }}
-                            onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
-                            onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
-                            onMouseLeave={handleSvgMouseLeave}
-                            onClick={handleSvgClick}
+                              }}
+                              onMouseDown={(e) => handleSvgMouseDown(displayIndex, e)}
+                              onMouseMove={(e) => handleSvgMouseMove(displayIndex, e)}
+                              onMouseLeave={handleSvgMouseLeave}
+                              onClick={handleSvgClick}
                             // onDoubleClick={handleSvgDoubleClick} // replaced by manual detection in handleSvgClick
-                            onContextMenu={(e) => handleSvgContextMenu(displayIndex, e)}
-                          />
+                              onContextMenu={(e) => handleSvgContextMenu(displayIndex, e)}
+                            />
+                          )}
                           {/* Selection Overlay (Overlay rotated element perfectly) */}
                           <svg
                             id={`highlight-overlay-${displayIndex}`}
@@ -8015,24 +8259,30 @@ const MainEditor = ({
                               display: 'none'
                             }}
                           />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                            <span className="text-[1.1vw] text-gray-300 font-medium mb-[0.4vw]">Base sheet ({Math.round(baseWidth)} x {Math.round(baseHeight)} mm)</span>
-                            {displayIndex === activePageIndex && (
-                              <span className="text-[1.5vw] text-gray-300 font-medium">Choose Templets to Edit page</span>
-                            )}
-                          </div>
-                          {/* Click Overlay to open gallery */}
-                          {displayIndex === activePageIndex && (
-                            <div
-                              className="absolute inset-0 cursor-pointer z-10"
-                              onClick={() => onOpenTemplateModal(displayIndex)}
-                              onContextMenu={(e) => e.preventDefault()}
-                            />
+
+                          {isPageEmpty && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none bg-transparent opacity-60">
+                              <div className="text-center text-[#B0B5C1] text-[0.85vw] font-normal leading-snug mb-[0.8vw]">
+                                Ready-made templates<br />are available for a quicker start
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                   e.stopPropagation();
+                                   onOpenTemplateModal(displayIndex);
+                                }}
+                                className="text-[#5145F6] hover:text-[#3B2DD6] text-[0.85vw] font-medium mb-[0.8vw] pointer-events-auto cursor-pointer underline underline-offset-4 decoration-1"
+                              >
+                                Add Templates
+                              </button>
+                              <div className="text-[#B0B5C1] text-[0.85vw] mb-[0.8vw] font-normal">
+                                (or)
+                              </div>
+                              <div className="text-[#D1D5DB] text-[0.85vw] font-normal">
+                                Create your own Design
+                              </div>
+                            </div>
                           )}
-                        </>
+                        </div>
                       );
                     })()}
                   </div>

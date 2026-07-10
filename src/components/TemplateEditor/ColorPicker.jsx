@@ -103,30 +103,12 @@ export const parseGradient = (gradientStr) => {
   }
 
   // Extract angle/radius
-  let angle = 180; // Default CSS angle for linear-gradient is 180deg (to bottom)
+  let angle = 0;
   let radius = 100;
 
   if (type === 'Linear' || type === 'Angular') {
     const angleMatch = gradientStr.match(/(\d+)deg/);
-    if (angleMatch) {
-      angle = parseInt(angleMatch[1]);
-    } else if (gradientStr.includes('to top right')) {
-      angle = 45;
-    } else if (gradientStr.includes('to bottom right')) {
-      angle = 135;
-    } else if (gradientStr.includes('to bottom left')) {
-      angle = 225;
-    } else if (gradientStr.includes('to top left')) {
-      angle = 315;
-    } else if (gradientStr.includes('to top')) {
-      angle = 0;
-    } else if (gradientStr.includes('to right')) {
-      angle = 90;
-    } else if (gradientStr.includes('to left')) {
-      angle = 270;
-    } else if (gradientStr.includes('to bottom')) {
-      angle = 180;
-    }
+    if (angleMatch) angle = parseInt(angleMatch[1]);
   }
 
   // For Radial, radius is encoded in stopsStr(radius) in generateGradientString
@@ -183,7 +165,7 @@ const hsvToHex = ({ h, s, v }) => {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
-export default function ColorPicker({ color, onChange, opacity, onOpacityChange, onClose, className, style, colorsOnPage = [], hidePalette = false, disableGradient = false, ...props }) {
+export default function ColorPicker({ color, onChange, opacity, onOpacityChange, onClose, className, style, colorsOnPage = [], hidePalette = false, ...props }) {
   const [view, setView] = useState(hidePalette ? "custom" : "palette"); // "palette" or "custom"
   const [mode, setMode] = useState(color?.includes("gradient") ? "gradient" : "solid");
   const [hsv, setHsv] = useState(() => hexToHsv(color || "#ffffff"));
@@ -499,27 +481,21 @@ export default function ColorPicker({ color, onChange, opacity, onOpacityChange,
         <div className="flex flex-col gap-[1vw]">
           {/* Header Controls */}
           <div className="flex items-center justify-between w-full mb-[0.5vw]">
-            {disableGradient ? (
-              <div className="flex items-center justify-center h-[2vw] px-[0.8vw] bg-white border border-gray-200 rounded-[0.5vw] text-[0.85vw] font-semibold text-gray-700 select-none shadow-sm">
-                Solid
-              </div>
-            ) : (
-              <PremiumDropdown
-                options={['Solid', 'Gradient']}
-                value={mode.charAt(0).toUpperCase() + mode.slice(1)}
-                onChange={(m) => {
-                  const newMode = m.toLowerCase();
-                  setMode(newMode);
-                  if (newMode === 'solid') {
-                    onChange(gradientStops[0].color);
-                  } else {
-                    updateGradient(gradientType, gradientStops, gradientAngle, gradientRadius);
-                  }
-                }}
-                width="5.5vw"
-                align="left"
-              />
-            )}
+            <PremiumDropdown
+              options={['Solid', 'Gradient']}
+              value={mode.charAt(0).toUpperCase() + mode.slice(1)}
+              onChange={(m) => {
+                const newMode = m.toLowerCase();
+                setMode(newMode);
+                if (newMode === 'solid') {
+                  onChange(gradientStops[0].color);
+                } else {
+                  updateGradient(gradientType, gradientStops, gradientAngle, gradientRadius);
+                }
+              }}
+              width="5.5vw"
+              align="left"
+            />
 
             {mode === 'gradient' && (
               <PremiumDropdown
