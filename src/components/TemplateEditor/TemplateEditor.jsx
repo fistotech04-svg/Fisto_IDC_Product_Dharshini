@@ -2129,17 +2129,25 @@ const TemplateEditor = () => {
     if (!gradEl) {
       gradEl = doc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
       gradEl.id = gradId;
-      if (svgGradType === 'linear') {
-        gradEl.setAttribute('x1', '0%');
-        gradEl.setAttribute('y1', '0%');
-        gradEl.setAttribute('x2', '100%');
-        gradEl.setAttribute('y2', '0%');
-      } else {
-        gradEl.setAttribute('cx', '50%');
-        gradEl.setAttribute('cy', '50%');
-        gradEl.setAttribute('r', '50%');
-      }
       defs.appendChild(gradEl);
+    }
+
+    // Always update gradient coordinates/radius (whether newly created or existing)
+    if (svgGradType === 'linear') {
+      const angleAttr = element.getAttribute(`${baseAttr}-angle`) || element.getAttribute(`data-${baseAttr}-angle`);
+      const angle = parseFloat(angleAttr !== null ? angleAttr : '180');
+      const mathAngle = angle - 90;
+      const angleRad = (mathAngle * Math.PI) / 180;
+      gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
+      gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
+      gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
+      gradEl.setAttribute('y2', Math.round(50 + Math.sin(angleRad) * 50) + '%');
+    } else {
+      const radiusAttr = element.getAttribute(`${baseAttr}-radius`) || element.getAttribute(`data-${baseAttr}-radius`);
+      const radius = parseFloat(radiusAttr !== null ? radiusAttr : '50');
+      gradEl.setAttribute('cx', '50%');
+      gradEl.setAttribute('cy', '50%');
+      gradEl.setAttribute('r', radius + '%');
     }
 
     // Update stops

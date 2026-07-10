@@ -232,7 +232,7 @@ const VideoEditor = ({
         strokeDashStyle: isDashed ? 'Dashed' : 'Solid',
         strokeGradientType: visualTarget.getAttribute('data-stroke-gradient-type') || 'linear',
         strokeStops: visualTarget.getAttribute('data-stroke-stops'),
-        strokeAngle: parseFloat(visualTarget.getAttribute('data-stroke-angle') || '0'),
+        strokeAngle: parseFloat(visualTarget.getAttribute('data-stroke-angle') || '180'),
         strokeRadius: parseFloat(visualTarget.getAttribute('data-stroke-radius') || '100'),
         strokeWeight: stWeight,
         strokeDashLength: dashLen,
@@ -567,18 +567,18 @@ const VideoEditor = ({
           fillLayer.setAttribute('data-fill-type', 'gradient');
           fillLayer.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
           fillLayer.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          fillLayer.setAttribute('data-fill-angle', parsedFill.angle || 90);
+          fillLayer.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
 
           fillLayer.setAttribute('fill-type', 'gradient');
           fillLayer.setAttribute('fill-stops', JSON.stringify(parsedFill.stops));
           fillLayer.setAttribute('fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          fillLayer.setAttribute('fill-angle', parsedFill.angle || 90);
+          fillLayer.setAttribute('fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
 
           syncGradient(liveElement.ownerDocument || document, fillLayer, 'fill');
           liveElement.setAttribute('data-fill-type', 'gradient');
           liveElement.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
           liveElement.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-          liveElement.setAttribute('data-fill-angle', parsedFill.angle || 90);
+          liveElement.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
         } else {
           fillLayer.setAttribute('fill', backgroundColor.fill);
           fillLayer.removeAttribute('data-fill-type');
@@ -716,13 +716,13 @@ const VideoEditor = ({
         if (backgroundColor.strokeType === 'gradient' && backgroundColor.strokeStops) {
           liveElement.setAttribute('data-stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
           liveElement.setAttribute('data-stroke-stops', backgroundColor.strokeStops || '');
-          liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle || '0');
+          liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
           liveElement.setAttribute('data-stroke-radius', backgroundColor.strokeRadius || '100');
 
           strokeOverlay.setAttribute('stroke-type', 'gradient');
           strokeOverlay.setAttribute('stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
           strokeOverlay.setAttribute('stroke-stops', backgroundColor.strokeStops || '');
-          strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle || '0');
+          strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
           strokeOverlay.setAttribute('stroke-radius', backgroundColor.strokeRadius || '100');
           syncGradient(liveElement.ownerDocument || document, strokeOverlay, 'stroke');
         } else {
@@ -2001,8 +2001,9 @@ function syncGradient(doc, element, baseAttr) {
     gradEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
     gradEl.id = gradId;
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
-      const angleRad = (angle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
+      const mathAngle = angle - 90;
+      const angleRad = (mathAngle * Math.PI) / 180;
       gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
       gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
       gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');

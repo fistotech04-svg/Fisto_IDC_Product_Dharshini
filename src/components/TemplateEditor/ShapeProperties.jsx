@@ -527,7 +527,7 @@ const ShapeProperties = ({
 
                         // Add 1.5vw to offset the popup cleanly from the sidebar's left edge
                         const pos = { right: `calc(100vw - ${rowRect.left}px + 1.5vw)` };
-                        
+
                         // Vertically center relative to the button, keeping within screen bounds
                         const centerY = btnRect.top + (btnRect.height / 2) - (popupHeight / 2);
                         pos.top = Math.max(90, Math.min(centerY, window.innerHeight - popupHeight - 20));
@@ -1153,7 +1153,7 @@ const ShapeProperties = ({
                   return generateGradientString(
                     gType.charAt(0).toUpperCase() + gType.slice(1),
                     stops.map(s => ({ ...s, opacity: (s.opacity !== undefined ? s.opacity : 1) * 100 })),
-                    parseInt(selectedElementProps[`${activeColorPicker}-angle`] || '0'),
+                    parseInt(selectedElementProps[`${activeColorPicker}-angle`] !== undefined ? selectedElementProps[`${activeColorPicker}-angle`] : '180'),
                     parseInt(selectedElementProps[`${activeColorPicker}-radius`] || '100')
                   );
                 }
@@ -1176,7 +1176,7 @@ const ShapeProperties = ({
                         offset: s.offset,
                         opacity: s.opacity / 100
                       }))),
-                      [`${activeColorPicker}-angle`]: (parsed.angle || 0).toString(),
+                      [`${activeColorPicker}-angle`]: (parsed.angle !== undefined ? parsed.angle : 180).toString(),
                       [`${activeColorPicker}-radius`]: (parsed.radius || 100).toString(),
                       [activeColorPicker]: newVal
                     });

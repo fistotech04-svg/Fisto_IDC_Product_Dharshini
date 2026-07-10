@@ -221,8 +221,10 @@ const syncGradient = (doc, element, baseAttr) => {
     gradEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
     gradEl.id = gradId;
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
-      const angleRad = (angle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
+      // Convert CSS angle to mathematical angle
+      const mathAngle = angle - 90;
+      const angleRad = (mathAngle * Math.PI) / 180;
       gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
       gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
       gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
@@ -1450,6 +1452,12 @@ const ImageEditor = ({
               liveElement.style.removeProperty('clip-path');
             } else {
               // --- SVG <image> Element (Native CSS Clip-Path) ---
+              if (!liveElement.hasAttribute('data-crop-orig-w')) {
+                liveElement.setAttribute('data-crop-orig-w', liveElement.getAttribute('width'));
+                liveElement.setAttribute('data-crop-orig-h', liveElement.getAttribute('height'));
+                liveElement.setAttribute('data-crop-orig-x', liveElement.getAttribute('x') || '0');
+                liveElement.setAttribute('data-crop-orig-y', liveElement.getAttribute('y') || '0');
+              }
               const svgClipVal = `inset(${crop.top}% ${100 - crop.left - crop.width}% ${100 - crop.top - crop.height}% ${crop.left}%${radiusStr})`;
               liveElement.style.setProperty('clip-path', svgClipVal, 'important');
               liveElement.style.setProperty('-webkit-clip-path', svgClipVal, 'important');
@@ -1533,69 +1541,69 @@ const ImageEditor = ({
           if (effectiveImageType !== 'Crop') {
             let wrapper = null;
             if (liveElement.tagName?.toLowerCase() === 'svg' && liveElement.classList.contains('svg-crop-wrapper')) {
-            wrapper = liveElement;
-          } else if (liveElement.parentNode?.tagName?.toLowerCase() === 'svg' && liveElement.parentNode.classList.contains('svg-crop-wrapper')) {
-            wrapper = liveElement.parentNode;
-          } else {
-            wrapper = liveElement.querySelector('.svg-crop-wrapper');
-          }
+              wrapper = liveElement;
+            } else if (liveElement.parentNode?.tagName?.toLowerCase() === 'svg' && liveElement.parentNode.classList.contains('svg-crop-wrapper')) {
+              wrapper = liveElement.parentNode;
+            } else {
+              wrapper = liveElement.querySelector('.svg-crop-wrapper');
+            }
 
-          if (wrapper) {
-            wrapper.removeAttribute('viewBox');
-            wrapper.removeAttribute('preserveAspectRatio'); // Useless without viewBox
+            if (wrapper) {
+              wrapper.removeAttribute('viewBox');
+              wrapper.removeAttribute('preserveAspectRatio'); // Useless without viewBox
 
-            const innerImg = wrapper.querySelector('image');
+              const innerImg = wrapper.querySelector('image');
 
-            let origW = wrapper.getAttribute('data-crop-orig-w') || liveElement.getAttribute('data-crop-orig-w') || innerImg?.getAttribute('data-crop-orig-w');
-            let origH = wrapper.getAttribute('data-crop-orig-h') || liveElement.getAttribute('data-crop-orig-h') || innerImg?.getAttribute('data-crop-orig-h');
-            let origX = wrapper.getAttribute('data-crop-orig-x') || liveElement.getAttribute('data-crop-orig-x') || innerImg?.getAttribute('data-crop-orig-x');
-            let origY = wrapper.getAttribute('data-crop-orig-y') || liveElement.getAttribute('data-crop-orig-y') || innerImg?.getAttribute('data-crop-orig-y');
+              let origW = wrapper.getAttribute('data-crop-orig-w') || liveElement.getAttribute('data-crop-orig-w') || innerImg?.getAttribute('data-crop-orig-w');
+              let origH = wrapper.getAttribute('data-crop-orig-h') || liveElement.getAttribute('data-crop-orig-h') || innerImg?.getAttribute('data-crop-orig-h');
+              let origX = wrapper.getAttribute('data-crop-orig-x') || liveElement.getAttribute('data-crop-orig-x') || innerImg?.getAttribute('data-crop-orig-x');
+              let origY = wrapper.getAttribute('data-crop-orig-y') || liveElement.getAttribute('data-crop-orig-y') || innerImg?.getAttribute('data-crop-orig-y');
 
-            // If origW is exactly '100' (the fallback for <g> elements), it's a fake dimension.
-            // We can reverse-engineer the true original dimension mathematically!
-            if (origW === '100' || !wrapper.hasAttribute('data-crop-orig-w')) {
-              const cropStr = liveElement.getAttribute('data-crop-data');
-              if (cropStr) {
-                try {
-                  const crop = JSON.parse(cropStr);
-                  const curW = parseFloat(wrapper.getAttribute('width'));
-                  const curH = parseFloat(wrapper.getAttribute('height'));
-                  if (curW && crop.width) origW = (curW / (crop.width / 100)).toString();
-                  if (curH && crop.height) origH = (curH / (crop.height / 100)).toString();
+              // If origW is exactly '100' (the fallback for <g> elements), it's a fake dimension.
+              // We can reverse-engineer the true original dimension mathematically!
+              if (origW === '100' || !wrapper.hasAttribute('data-crop-orig-w')) {
+                const cropStr = liveElement.getAttribute('data-crop-data');
+                if (cropStr) {
+                  try {
+                    const crop = JSON.parse(cropStr);
+                    const curW = parseFloat(wrapper.getAttribute('width'));
+                    const curH = parseFloat(wrapper.getAttribute('height'));
+                    if (curW && crop.width) origW = (curW / (crop.width / 100)).toString();
+                    if (curH && crop.height) origH = (curH / (crop.height / 100)).toString();
 
-                  // For x and y, if we don't know the exact original, '0' is safest for <g> templates
-                  if (!origX || origX === '0') origX = '0';
-                  if (!origY || origY === '0') origY = '0';
-                } catch (e) { }
+                    // For x and y, if we don't know the exact original, '0' is safest for <g> templates
+                    if (!origX || origX === '0') origX = '0';
+                    if (!origY || origY === '0') origY = '0';
+                  } catch (e) { }
+                }
               }
+
+              if (origW) {
+                wrapper.setAttribute('width', origW);
+                wrapper.setAttribute('height', origH);
+                if (origX) wrapper.setAttribute('x', origX);
+                if (origY) wrapper.setAttribute('y', origY);
+              }
+
+              if (innerImg) {
+                innerImg.style.removeProperty('display');
+                innerImg.setAttribute('width', '100%');
+                innerImg.setAttribute('height', '100%');
+                const parMap = { 'Fit': 'xMidYMid meet', 'Fill': 'xMidYMid slice', 'Crop': 'xMidYMid slice', 'Stretch': 'none' };
+                innerImg.setAttribute('preserveAspectRatio', parMap[effectiveImageType] || 'xMidYMid meet');
+              }
+
+              const cropRect = wrapper.querySelector('.internal-crop-rect');
+              if (cropRect) cropRect.style.setProperty('display', 'none', 'important');
             }
 
-            if (origW) {
-              wrapper.setAttribute('width', origW);
-              wrapper.setAttribute('height', origH);
-              if (origX) wrapper.setAttribute('x', origX);
-              if (origY) wrapper.setAttribute('y', origY);
+            liveElement.style.removeProperty('background-image');
+            liveElement.style.removeProperty('background-size');
+            liveElement.style.removeProperty('background-position');
+            liveElement.style.removeProperty('background-repeat');
+            if (liveElement.hasAttribute('data-original-src') && liveElement.tagName?.toLowerCase() === 'img') {
+              liveElement.src = liveElement.getAttribute('data-original-src');
             }
-
-            if (innerImg) {
-              innerImg.style.removeProperty('display');
-              innerImg.setAttribute('width', '100%');
-              innerImg.setAttribute('height', '100%');
-              const parMap = { 'Fit': 'xMidYMid meet', 'Fill': 'xMidYMid slice', 'Crop': 'xMidYMid slice', 'Stretch': 'none' };
-              innerImg.setAttribute('preserveAspectRatio', parMap[effectiveImageType] || 'xMidYMid meet');
-            }
-
-            const cropRect = wrapper.querySelector('.internal-crop-rect');
-            if (cropRect) cropRect.style.setProperty('display', 'none', 'important');
-          }
-
-          liveElement.style.removeProperty('background-image');
-          liveElement.style.removeProperty('background-size');
-          liveElement.style.removeProperty('background-position');
-          liveElement.style.removeProperty('background-repeat');
-          if (liveElement.hasAttribute('data-original-src') && liveElement.tagName?.toLowerCase() === 'img') {
-            liveElement.src = liveElement.getAttribute('data-original-src');
-          }
 
             if (svgImageEl) {
               svgImageEl.style.removeProperty('transform');
@@ -2069,18 +2077,18 @@ const ImageEditor = ({
             fillLayer.setAttribute('data-fill-type', 'gradient');
             fillLayer.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
             fillLayer.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            fillLayer.setAttribute('data-fill-angle', parsedFill.angle || 90);
+            fillLayer.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
             // syncGradient reads non-data-prefixed attributes
             fillLayer.setAttribute('fill-type', 'gradient');
             fillLayer.setAttribute('fill-stops', JSON.stringify(parsedFill.stops));
             fillLayer.setAttribute('fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            fillLayer.setAttribute('fill-angle', parsedFill.angle || 90);
+            fillLayer.setAttribute('fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
             syncGradient(liveElement.ownerDocument || document, fillLayer, 'fill');
 
             liveElement.setAttribute('data-fill-type', 'gradient');
             liveElement.setAttribute('data-fill-stops', JSON.stringify(parsedFill.stops));
             liveElement.setAttribute('data-fill-gradient-type', parsedFill.type.toLowerCase() || 'linear');
-            liveElement.setAttribute('data-fill-angle', parsedFill.angle || 90);
+            liveElement.setAttribute('data-fill-angle', parsedFill.angle !== undefined ? parsedFill.angle : 180);
           } else {
             fillLayer.setAttribute('fill', backgroundColor.fill);
             fillLayer.removeAttribute('data-fill-type');
@@ -2284,10 +2292,13 @@ const ImageEditor = ({
             liveElement.setAttribute('data-stroke-angle', backgroundColor.strokeAngle || '0');
             liveElement.setAttribute('data-stroke-radius', backgroundColor.strokeRadius || '100');
 
+            strokeOverlay.setAttribute('data-stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
+            strokeOverlay.setAttribute('data-stroke-radius', backgroundColor.strokeRadius || '100');
+            // syncGradient reads non-data-prefixed attributes
             strokeOverlay.setAttribute('stroke-type', 'gradient');
-            strokeOverlay.setAttribute('stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
             strokeOverlay.setAttribute('stroke-stops', backgroundColor.strokeStops || '');
-            strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle || '0');
+            strokeOverlay.setAttribute('stroke-gradient-type', backgroundColor.strokeGradientType || 'linear');
+            strokeOverlay.setAttribute('stroke-angle', backgroundColor.strokeAngle !== undefined ? backgroundColor.strokeAngle : 180);
             strokeOverlay.setAttribute('stroke-radius', backgroundColor.strokeRadius || '100');
             syncGradient(liveElement.ownerDocument || document, strokeOverlay, 'stroke');
           } else {
@@ -2352,7 +2363,15 @@ const ImageEditor = ({
             const inner_tr = Math.max(0, Math.min(tr, innerMaxR));
             const inner_br = Math.max(0, Math.min(br, innerMaxR));
             const inner_bl = Math.max(0, Math.min(bl, innerMaxR));
-            clipPathEl.setAttribute('d', getPathD(bx, by, Math.max(0, bw), Math.max(0, bh), inner_tl, inner_tr, inner_br, inner_bl));
+
+            let clipX = bx;
+            let clipY = by;
+            if (targetElForStroke.tagName?.toLowerCase() === 'svg') {
+              clipX = 0;
+              clipY = 0;
+            }
+
+            clipPathEl.setAttribute('d', getPathD(clipX, clipY, Math.max(0, bw), Math.max(0, bh), inner_tl, inner_tr, inner_br, inner_bl));
           }
 
           const isStrokeCropped = imageType === 'Crop' && (liveElement.getAttribute('data-crop-data') || (selectedElement && selectedElement.getAttribute('data-crop-data')));

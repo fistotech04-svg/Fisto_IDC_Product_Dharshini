@@ -18,7 +18,7 @@ export const getVisualBBox = (el) => {
   if (!el || typeof el.getBBox !== 'function') return { x: 0, y: 0, width: 0, height: 0 };
 
   const cropStr = el.getAttribute('data-crop-data');
-  if (cropStr && cropStr !== 'null') {
+  if (cropStr && cropStr !== 'null' && !el.hasAttribute('data-slideshow-cropped')) {
     const bbox = el.getBBox();
     try {
       const crop = JSON.parse(cropStr);
@@ -75,6 +75,61 @@ export const getVisualBBox = (el) => {
   }
 
   return el.getBBox();
+};
+
+export const applySlideshowCrop = (el, imgEl, nextIndex) => {
+  if (imgEl.tagName?.toLowerCase() !== 'image' || !el.hasAttribute('data-crop-data')) return;
+  try {
+    if (nextIndex === 0) {
+      el.removeAttribute('data-slideshow-cropped');
+      const origClip = el.getAttribute('data-orig-clip-path');
+      if (origClip) {
+        imgEl.style.setProperty('clip-path', origClip, 'important');
+        imgEl.style.setProperty('-webkit-clip-path', origClip, 'important');
+      }
+      const origW = el.getAttribute('data-crop-orig-w');
+      if (origW) {
+        imgEl.setAttribute('width', origW);
+        imgEl.setAttribute('height', el.getAttribute('data-crop-orig-h'));
+        imgEl.setAttribute('x', el.getAttribute('data-crop-orig-x') || 0);
+        imgEl.setAttribute('y', el.getAttribute('data-crop-orig-y') || 0);
+      }
+    } else {
+      el.setAttribute('data-slideshow-cropped', 'true');
+      if (!el.hasAttribute('data-orig-clip-path')) {
+        el.setAttribute('data-orig-clip-path', imgEl.style.clipPath);
+      }
+      imgEl.style.removeProperty('clip-path');
+      imgEl.style.removeProperty('-webkit-clip-path');
+      
+      let origWStr = el.getAttribute('data-crop-orig-w');
+      if (!origWStr) {
+        origWStr = imgEl.getAttribute('width');
+        if (!origWStr) return;
+        el.setAttribute('data-crop-orig-w', origWStr);
+        el.setAttribute('data-crop-orig-h', imgEl.getAttribute('height'));
+        el.setAttribute('data-crop-orig-x', imgEl.getAttribute('x') || 0);
+        el.setAttribute('data-crop-orig-y', imgEl.getAttribute('y') || 0);
+      }
+      
+      const origW = parseFloat(origWStr);
+      const origH = parseFloat(el.getAttribute('data-crop-orig-h'));
+      const origX = parseFloat(el.getAttribute('data-crop-orig-x') || 0);
+      const origY = parseFloat(el.getAttribute('data-crop-orig-y') || 0);
+      
+      const crop = JSON.parse(el.getAttribute('data-crop-data'));
+      
+      const newX = origX + (parseFloat(crop.left) / 100) * origW;
+      const newY = origY + (parseFloat(crop.top) / 100) * origH;
+      const newW = origW * (parseFloat(crop.width) / 100);
+      const newH = origH * (parseFloat(crop.height) / 100);
+      
+      imgEl.setAttribute('width', newW);
+      imgEl.setAttribute('height', newH);
+      imgEl.setAttribute('x', newX);
+      imgEl.setAttribute('y', newY);
+    }
+  } catch(e) {}
 };
 
 // Global style to ensure injected SVGs always fill their container perfectly
@@ -1119,6 +1174,7 @@ const MainEditor = ({
         if (imgTag2 === 'image') {
           imgEl.setAttribute('href', url);
           try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          applySlideshowCrop(el, imgEl, nextIndex);
         } else if (imgTag2 === 'img') {
           imgEl.src = url;
         } else {
@@ -1229,6 +1285,7 @@ const MainEditor = ({
               if (imgTag === 'image') {
                 imgEl.setAttribute('href', url);
                 try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
+                applySlideshowCrop(el, imgEl, nextIndex);
               } else if (imgTag === 'img') {
                 imgEl.src = url;
               } else {
@@ -1323,6 +1380,7 @@ const MainEditor = ({
         if (imgTag === 'image') {
           imgEl.setAttribute('href', url);
           try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          applySlideshowCrop(slideshowEl, imgEl, nextIndex);
         } else if (imgTag === 'img') {
           imgEl.src = url;
         } else {

@@ -201,9 +201,10 @@ const syncGradient = (doc, element, baseAttr) => {
     gradEl.id = gradId;
     // Calculate angle for linear gradients
     if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
-      // Convert angle to SVG coordinates (0 deg is horizontal left-to-right)
-      const angleRad = (angle * Math.PI) / 180;
+      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
+      // Convert angle to SVG coordinates
+      const mathAngle = angle - 90;
+      const angleRad = (mathAngle * Math.PI) / 180;
       const x1 = Math.round(50 - Math.cos(angleRad) * 50) + '%';
       const y1 = Math.round(50 - Math.sin(angleRad) * 50) + '%';
       const x2 = Math.round(50 + Math.cos(angleRad) * 50) + '%';
@@ -222,8 +223,9 @@ const syncGradient = (doc, element, baseAttr) => {
     defs.appendChild(gradEl);
   } else if (svgGradType === 'linear') {
     // Update existing linear gradient angle
-    const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
-    const angleRad = (angle * Math.PI) / 180;
+    const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
+    const mathAngle = angle - 90;
+    const angleRad = (mathAngle * Math.PI) / 180;
     gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
     gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
     gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
@@ -255,7 +257,7 @@ const syncGradient = (doc, element, baseAttr) => {
     if (baseAttr === 'fill') {
       let cssGradStr = '';
       if (svgGradType === 'linear') {
-        const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
+        const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '180');
         cssGradStr = `linear-gradient(${angle}deg, ${stops.map(s => `${s.color} ${s.offset}%`).join(', ')})`;
       } else {
         cssGradStr = `radial-gradient(circle, ${stops.map(s => `${s.color} ${s.offset}%`).join(', ')})`;
@@ -573,7 +575,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     fillType: selectedElementProps?.['fill-type'] || 'solid',
     fillGradientType: selectedElementProps?.['fill-gradient-type'] || 'linear',
     fillStops: selectedElementProps?.['fill-stops'],
-    fillAngle: parseFloat(selectedElementProps?.['fill-angle'] || 0),
+    fillAngle: parseFloat(selectedElementProps?.['fill-angle'] !== undefined ? selectedElementProps['fill-angle'] : 180),
     fillRadius: parseFloat(selectedElementProps?.['fill-radius'] || 100),
     stroke: selectedElementProps?.stroke || 'none',
     strokeOpacity: 100,
@@ -582,7 +584,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
     strokeType: selectedElementProps?.['stroke-type'] || 'solid',
     strokeGradientType: selectedElementProps?.['stroke-gradient-type'] || 'linear',
     strokeStops: selectedElementProps?.['stroke-stops'],
-    strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] || 0),
+    strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] !== undefined ? selectedElementProps['stroke-angle'] : 180),
     strokeRadius: parseFloat(selectedElementProps?.['stroke-radius'] || 100),
     strokeDashLength: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
     strokeDashGap: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[1] || (selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
@@ -637,7 +639,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       fillType: selectedElementProps?.['fill-type'] || 'solid',
       fillGradientType: selectedElementProps?.['fill-gradient-type'] || 'linear',
       fillStops: selectedElementProps?.['fill-stops'],
-      fillAngle: parseFloat(selectedElementProps?.['fill-angle'] || 0),
+      fillAngle: parseFloat(selectedElementProps?.['fill-angle'] !== undefined ? selectedElementProps['fill-angle'] : 180),
       fillRadius: parseFloat(selectedElementProps?.['fill-radius'] || 100),
       stroke: selectedElementProps?.stroke || 'none',
       strokeOpacity: 100,
@@ -646,7 +648,7 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       strokeType: selectedElementProps?.['stroke-type'] || 'solid',
       strokeGradientType: selectedElementProps?.['stroke-gradient-type'] || 'linear',
       strokeStops: selectedElementProps?.['stroke-stops'],
-      strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] || 0),
+      strokeAngle: parseFloat(selectedElementProps?.['stroke-angle'] !== undefined ? selectedElementProps['stroke-angle'] : 180),
       strokeRadius: parseFloat(selectedElementProps?.['stroke-radius'] || 100),
       strokeDashLength: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
       strokeDashGap: parseInt((selectedElementProps?.strokeDasharray || '5,5').split(',')[1] || (selectedElementProps?.strokeDasharray || '5,5').split(',')[0]) || 5,
@@ -678,16 +680,15 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
   useEffect(() => {
     if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     updateTimeoutRef.current = setTimeout(() => {
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill', backgroundColor.fill);
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'opacity', (backgroundColor.fillOpacity / 100).toString());
       if (backgroundColor.fillType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-type', backgroundColor.fillType);
       if (backgroundColor.fillGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-gradient-type', backgroundColor.fillGradientType);
       if (backgroundColor.fillStops) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-stops', backgroundColor.fillStops);
       if (backgroundColor.fillAngle !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-angle', backgroundColor.fillAngle.toString());
       if (backgroundColor.fillRadius !== undefined) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill-radius', backgroundColor.fillRadius.toString());
 
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke', backgroundColor.stroke);
-      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeWidth', backgroundColor.strokeWeight.toString());
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'fill', backgroundColor.fill);
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'opacity', (backgroundColor.fillOpacity / 100).toString());
+
       if (backgroundColor.strokeType === 'gradient' || backgroundColor.strokeStops) {
         updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'gradient');
         if (backgroundColor.strokeGradientType) updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-gradient-type', backgroundColor.strokeGradientType);
@@ -697,6 +698,9 @@ const TextEditorSubComponentAdapter = ({ selectedElementProps, activePageIndex, 
       } else if (backgroundColor.stroke !== 'none' && !backgroundColor.stroke.includes('url(#')) {
         updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke-type', 'solid');
       }
+
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'stroke', backgroundColor.stroke);
+      updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeWidth', backgroundColor.strokeWeight.toString());
 
       const dashVal = backgroundColor.strokeDashStyle === 'Dashed' ? `${backgroundColor.strokeDashLength || 5},${backgroundColor.strokeDashGap || 5}` : 'none';
       updateElementAttributeLocal(activePageIndex, selectedLayerId, 'strokeDasharray', dashVal);
@@ -965,8 +969,9 @@ const TextEditor = ({
               applyVal = `'${applyVal}'`;
             }
             if (styleProp === 'stroke') {
-              liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', finalVal, 'important');
-              Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-color', finalVal, 'important'));
+              const strokeColor = finalVal === 'none' ? 'transparent' : finalVal;
+              liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
+              Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important'));
             } else if (styleProp === 'strokeWidth') {
               liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important');
               Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important'));
@@ -975,6 +980,17 @@ const TextEditor = ({
               const cssPropName = liveProp.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
               liveEl.firstElementChild.style.setProperty(cssPropName, applyVal, 'important');
               Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty(cssPropName, applyVal, 'important'));
+              
+              if (styleProp === 'fill' && !applyVal.includes('url(')) {
+                const removeGrad = (el) => {
+                  el.style.removeProperty('background-image');
+                  el.style.removeProperty('-webkit-background-clip');
+                  el.style.removeProperty('background-clip');
+                  el.style.removeProperty('-webkit-text-fill-color');
+                };
+                removeGrad(liveEl.firstElementChild);
+                Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(removeGrad);
+              }
             }
 
             // General Auto-resize for layout-affecting properties
@@ -998,6 +1014,13 @@ const TextEditor = ({
             const paintOrder = pos === 'Outside' ? 'stroke fill' : 'normal';
             liveEl.firstElementChild.style.setProperty('paint-order', paintOrder, 'important');
             Array.from(liveEl.firstElementChild.querySelectorAll('*')).forEach(child => child.style.setProperty('paint-order', paintOrder, 'important'));
+          }
+          
+          if (attribute === 'fill' || attribute === 'stroke') {
+            liveEl.setAttribute(attribute, value);
+          } else if (attribute === 'strokeWidth' || attribute === 'stroke-width') {
+            liveEl.setAttribute('stroke-width', value);
+            liveEl.setAttribute('strokeWidth', value);
           }
         } else {
           if (styleProp) {
@@ -1116,7 +1139,8 @@ const TextEditor = ({
           if (isScrollable && liveEl.firstElementChild) {
             const s = attribute === 'stroke' ? value : (liveEl.getAttribute('stroke') || 'none');
             const sw = (attribute === 'strokeWidth' || attribute === 'stroke-width') ? value : (liveEl.getAttribute('strokeWidth') || liveEl.getAttribute('stroke-width') || '0');
-            liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', s, 'important');
+            const strokeColor = s === 'none' ? 'transparent' : s;
+            liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
             liveEl.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${sw}px`, 'important');
             // Remove border just in case it was applied before
             liveEl.firstElementChild.style.border = 'none';
@@ -1408,12 +1432,20 @@ const TextEditor = ({
           if (tag === 'foreignobject') {
             if (element.firstElementChild) {
               if (styleProp === 'stroke') {
-                element.firstElementChild.style.setProperty('-webkit-text-stroke-color', finalVal, 'important');
+                const strokeColor = finalVal === 'none' ? 'transparent' : finalVal;
+                element.firstElementChild.style.setProperty('-webkit-text-stroke-color', strokeColor, 'important');
               } else if (styleProp === 'strokeWidth') {
                 element.firstElementChild.style.setProperty('-webkit-text-stroke-width', `${finalVal}px`, 'important');
               } else {
                 const cssPropName = finalProp.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
                 element.firstElementChild.style.setProperty(cssPropName, finalVal, 'important');
+                
+                if (styleProp === 'fill' && !finalVal.includes('url(')) {
+                  element.firstElementChild.style.removeProperty('background-image');
+                  element.firstElementChild.style.removeProperty('-webkit-background-clip');
+                  element.firstElementChild.style.removeProperty('background-clip');
+                  element.firstElementChild.style.removeProperty('-webkit-text-fill-color');
+                }
               }
 
               // --- SCROLLABLE PERSISTENCE ---

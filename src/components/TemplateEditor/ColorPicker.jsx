@@ -103,12 +103,30 @@ export const parseGradient = (gradientStr) => {
   }
 
   // Extract angle/radius
-  let angle = 0;
+  let angle = 180; // Default CSS angle for linear-gradient is 180deg (to bottom)
   let radius = 100;
 
   if (type === 'Linear' || type === 'Angular') {
     const angleMatch = gradientStr.match(/(\d+)deg/);
-    if (angleMatch) angle = parseInt(angleMatch[1]);
+    if (angleMatch) {
+      angle = parseInt(angleMatch[1]);
+    } else if (gradientStr.includes('to top right')) {
+      angle = 45;
+    } else if (gradientStr.includes('to bottom right')) {
+      angle = 135;
+    } else if (gradientStr.includes('to bottom left')) {
+      angle = 225;
+    } else if (gradientStr.includes('to top left')) {
+      angle = 315;
+    } else if (gradientStr.includes('to top')) {
+      angle = 0;
+    } else if (gradientStr.includes('to right')) {
+      angle = 90;
+    } else if (gradientStr.includes('to left')) {
+      angle = 270;
+    } else if (gradientStr.includes('to bottom')) {
+      angle = 180;
+    }
   }
 
   // For Radial, radius is encoded in stopsStr(radius) in generateGradientString

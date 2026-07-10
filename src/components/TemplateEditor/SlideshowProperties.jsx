@@ -22,6 +22,7 @@ import PremiumDropdown from '../CustomizedEditor/PremiumDropdown';
 import NavIconStylesPopup, { NavIconRenderer } from '../CustomizedEditor/popups/NavIconStylesPopup';
 import axios from 'axios';
 import ColorPicker from './ColorPicker';
+import { getVisualBBox, applySlideshowCrop } from './MainEditor';
 
 const DraggableSpan = ({ label, value, onChange, min = 0, max = 100, className }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -384,6 +385,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
             if (targetImg.tagName?.toLowerCase() === 'img') targetImg.src = url;
             if (setPreviewSrcRef.current) setPreviewSrcRef.current(url);
           }
+          applySlideshowCrop(targetElement, targetImg, activeSlideIndex);
         }
 
         // Fit mode
@@ -512,6 +514,8 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
       try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
       if (imgEl.tagName?.toLowerCase() === 'img') imgEl.src = url;
       if (setPreviewSrcRef.current) setPreviewSrcRef.current(url);
+      
+      applySlideshowCrop(targetElement, imgEl, newIdx);
     };
 
     const animEl = targetElement;
@@ -690,9 +694,30 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
       }
 
       const containerRect = pageContainer.parentElement.getBoundingClientRect();
-      const elRect = freshTarget.getBoundingClientRect();
-
-      // Compute actual CSS scale of the container
+      let elRect;
+      try {
+        const bbox = getVisualBBox(freshTarget);
+        const ctm = freshTarget.getScreenCTM();
+        const pt = freshTarget.ownerSVGElement.createSVGPoint();
+        const corners = [
+          { x: bbox.x, y: bbox.y },
+          { x: bbox.x + bbox.width, y: bbox.y },
+          { x: bbox.x, y: bbox.y + bbox.height },
+          { x: bbox.x + bbox.width, y: bbox.y + bbox.height }
+        ];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (let c of corners) {
+          pt.x = c.x; pt.y = c.y;
+          const mapped = pt.matrixTransform(ctm);
+          if (mapped.x < minX) minX = mapped.x;
+          if (mapped.y < minY) minY = mapped.y;
+          if (mapped.x > maxX) maxX = mapped.x;
+          if (mapped.y > maxY) maxY = mapped.y;
+        }
+        elRect = { left: minX, top: minY, right: maxX, bottom: maxY, width: maxX - minX, height: maxY - minY };
+      } catch (e) {
+        elRect = freshTarget.getBoundingClientRect();
+      }
       const scaleX = containerRect.width / (pageContainer.offsetWidth || 1);
       const scaleY = containerRect.height / (pageContainer.offsetHeight || 1);
 
