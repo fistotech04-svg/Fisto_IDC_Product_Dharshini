@@ -324,8 +324,7 @@ const GifEditor = ({
           newGroup.setAttribute('data-name', 'GIF Group');
           newGroup.setAttribute('data-is-gif-group', 'true');
 
-          const newImgId = `gif-${Math.random().toString(36).substr(2, 9)}`;
-          liveElement.id = newImgId;
+          liveElement.removeAttribute('id');
           liveElement.setAttribute('data-name', 'GIF');
 
           if (liveElement.hasAttribute('transform')) {

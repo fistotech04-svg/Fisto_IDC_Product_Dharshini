@@ -387,14 +387,17 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
         }
 
         // Fit mode
-        if (targetImg.tagName?.toLowerCase() === 'image') {
-          const val = slideshowSettings.imageFitType === 'Fill All' ? 'xMidYMid slice' : 'xMidYMid meet';
-          targetImg.setAttribute('preserveAspectRatio', val);
-        } else if (targetImg.tagName?.toLowerCase() === 'img') {
-          const val = slideshowSettings.imageFitType === 'Fill All' ? 'cover' : 'contain';
-          targetImg.style.objectFit = val;
-          targetImg.style.width = '100%';
-          targetImg.style.height = '100%';
+        const isCropped = targetElement.getAttribute('data-crop-data') || targetImg.getAttribute('data-crop-data') || targetImg.style.clipPath;
+        if (!isCropped) {
+          if (targetImg.tagName?.toLowerCase() === 'image') {
+            const val = slideshowSettings.imageFitType === 'Fill All' ? 'xMidYMid slice' : 'xMidYMid meet';
+            targetImg.setAttribute('preserveAspectRatio', val);
+          } else if (targetImg.tagName?.toLowerCase() === 'img') {
+            const val = slideshowSettings.imageFitType === 'Fill All' ? 'cover' : 'contain';
+            targetImg.style.objectFit = val;
+            targetImg.style.width = '100%';
+            targetImg.style.height = '100%';
+          }
         }
 
         // Ensure container doesn't bleed
@@ -600,26 +603,26 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
     const cleanupAnim = () => {
       if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
       if (newPattern && newPattern.parentNode) newPattern.parentNode.removeChild(newPattern);
-      
+
       // Additional failsafe for SVG filters in Safari
       if (animEl.style.filter === 'none') {
         animEl.style.removeProperty('filter');
       }
     };
-    
+
     realAnim.onfinish = () => {
       cleanupAnim();
       animEl.style.transformBox = '';
       animEl.style.transformOrigin = '';
       finalize();
     };
-    
+
     // Fallback in case onfinish doesn't fire (especially for 0 duration)
     setTimeout(() => {
-        cleanupAnim();
-        animEl.style.transformBox = '';
-        animEl.style.transformOrigin = '';
-        finalize();
+      cleanupAnim();
+      animEl.style.transformBox = '';
+      animEl.style.transformOrigin = '';
+      finalize();
     }, duration + 20);
 
   }, [activePageIndex, selectedElement, slideshowSettings, opacity, setIsUpdatingDOM]);
@@ -680,7 +683,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
       // This prevents the global runner from spawning a duplicate overlay.
       if (!freshTarget.hasAttribute('data-slideshow-manual')) {
         freshTarget.setAttribute('data-slideshow-manual', 'true');
-        
+
         // If the global runner already spawned an overlay in the split-second before we caught it, remove it
         if (freshTarget._globalSsOverlay) {
           if (freshTarget._globalSsOverlay._cleanupHover) freshTarget._globalSsOverlay._cleanupHover();
@@ -692,15 +695,56 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
       const containerRect = pageContainer.parentElement.getBoundingClientRect();
       const elRect = freshTarget.getBoundingClientRect();
 
+      let targetLeft = elRect.left;
+      let targetTop = elRect.top;
+      let targetWidth = elRect.width;
+      let targetHeight = elRect.height;
+
+      const cropDataStr = freshTarget.getAttribute('data-crop-data');
+      if (freshTarget.getAttribute('data-effect-crop-inset') === 'true' && cropDataStr) {
+        try {
+          const crop = JSON.parse(cropDataStr);
+          const cLeft = parseFloat(crop.left) || 0;
+          const cTop = parseFloat(crop.top) || 0;
+          const cWidth = parseFloat(crop.width) || 100;
+          const cHeight = parseFloat(crop.height) || 100;
+
+          targetLeft += elRect.width * (cLeft / 100);
+          targetTop += elRect.height * (cTop / 100);
+          targetWidth = elRect.width * (cWidth / 100);
+          targetHeight = elRect.height * (cHeight / 100);
+        } catch (e) { }
+      } else {
+        // Check if a parent has the crop data
+        const cropParent = freshTarget.closest('[data-effect-crop-inset="true"]');
+        if (cropParent) {
+          const pCropStr = cropParent.getAttribute('data-crop-data');
+          if (pCropStr) {
+            try {
+              const crop = JSON.parse(pCropStr);
+              const cLeft = parseFloat(crop.left) || 0;
+              const cTop = parseFloat(crop.top) || 0;
+              const cWidth = parseFloat(crop.width) || 100;
+              const cHeight = parseFloat(crop.height) || 100;
+
+              targetLeft += elRect.width * (cLeft / 100);
+              targetTop += elRect.height * (cTop / 100);
+              targetWidth = elRect.width * (cWidth / 100);
+              targetHeight = elRect.height * (cHeight / 100);
+            } catch (e) { }
+          }
+        }
+      }
+
       // Compute actual CSS scale of the container
       const scaleX = containerRect.width / (pageContainer.offsetWidth || 1);
       const scaleY = containerRect.height / (pageContainer.offsetHeight || 1);
 
       // Offset in screen pixels → divide by scale → local layout pixels
-      const localLeft = (elRect.left - containerRect.left) / scaleX;
-      const localTop = (elRect.top - containerRect.top) / scaleY;
-      const localWidth = elRect.width / scaleX;
-      const localHeight = elRect.height / scaleY;
+      const localLeft = (targetLeft - containerRect.left) / scaleX;
+      const localTop = (targetTop - containerRect.top) / scaleY;
+      const localWidth = targetWidth / scaleX;
+      const localHeight = targetHeight / scaleY;
 
       overlay.style.left = localLeft + 'px';
       overlay.style.top = localTop + 'px';
@@ -837,7 +881,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
         });
         const iconKey = type === 'prev' ? 'left' : 'right';
         const root = createRoot(btn);
-        
+
         const isGrad = navIconColor && navIconColor.toUpperCase().includes('GRADIENT');
         let stops = [];
         if (isGrad) {
@@ -848,7 +892,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
           }
         }
         const gradId = `nav-grad-${type}-${Math.random().toString(36).substring(2, 7)}`;
-        
+
         root.render(
           <>
             {isGrad && stops.length > 0 && (

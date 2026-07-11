@@ -422,8 +422,7 @@ const VideoEditor = ({
         newGroup.setAttribute('data-name', 'Video Group');
         newGroup.setAttribute('data-is-video-group', 'true');
 
-        const newVidId = `video-${Math.random().toString(36).substr(2, 9)}`;
-        liveElement.id = newVidId;
+        liveElement.removeAttribute('id');
         liveElement.setAttribute('data-name', 'Video');
 
         if (liveElement.hasAttribute('transform')) {
