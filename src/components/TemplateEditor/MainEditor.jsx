@@ -8087,7 +8087,6 @@ const MainEditor = ({
                               display: 'none'
                             }}
                           />
-
                           {isPageEmpty && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none bg-transparent opacity-60">
                               <div className="text-center text-[#B0B5C1] text-[0.85vw] font-normal leading-snug mb-[0.8vw]">

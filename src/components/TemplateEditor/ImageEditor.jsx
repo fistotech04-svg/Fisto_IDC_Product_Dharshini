@@ -36,228 +36,18 @@ import { createPortal } from 'react-dom';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import GalleryImage from './GalleryImage';
 import SlideshowProperties from './SlideshowProperties';
-import SubComponent from './SubComponent';
+import Color from './Color';
+import CornerRadius from './CornerRadius';
+import Adjustment from './Adjustment';
+import Effect from './Effect';
+import { syncGradient, getSvgImageEl } from './editorUtils';
+import CropOverlay from './CropOverlay';
 
 
 
 
-const CropOverlay = ({ src, initialCrop, onCancel, onDone }) => {
-  const [crop, setCrop] = useState(() => {
-    try {
-      if (typeof initialCrop === 'string') return JSON.parse(initialCrop);
-      if (initialCrop) return initialCrop;
-    } catch (e) { }
-    return { left: 0, top: 0, width: 100, height: 100 };
-  });
-  const containerRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0, crop: null });
-  const [dragType, setDragType] = useState(null);
 
-  const handlePointerDown = (e, type) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-    setDragType(type);
-    setDragStart({ x: e.clientX, y: e.clientY, crop: { ...crop } });
-  };
 
-  const handlePointerMove = useCallback((e) => {
-    if (!isDragging || !containerRef.current) return;
-    const container = containerRef.current.getBoundingClientRect();
-    const dx = ((e.clientX - dragStart.x) / container.width) * 100;
-    const dy = ((e.clientY - dragStart.y) / container.height) * 100;
-
-    let newCrop = { ...dragStart.crop };
-
-    if (dragType === 'move') {
-      newCrop.left += dx;
-      newCrop.top += dy;
-    } else {
-      if (dragType.includes('w')) { newCrop.left += dx; newCrop.width -= dx; }
-      if (dragType.includes('e')) { newCrop.width += dx; }
-      if (dragType.includes('n')) { newCrop.top += dy; newCrop.height -= dy; }
-      if (dragType.includes('s')) { newCrop.height += dy; }
-    }
-
-    if (newCrop.left < 0) { newCrop.width += newCrop.left; newCrop.left = 0; }
-    if (newCrop.top < 0) { newCrop.height += newCrop.top; newCrop.top = 0; }
-    if (newCrop.left + newCrop.width > 100) { newCrop.width = 100 - newCrop.left; }
-    if (newCrop.top + newCrop.height > 100) { newCrop.height = 100 - newCrop.top; }
-
-    newCrop.width = Math.max(5, newCrop.width);
-    newCrop.height = Math.max(5, newCrop.height);
-
-    if (dragType.includes('w') && newCrop.left > dragStart.crop.left + dragStart.crop.width - 5) {
-      newCrop.left = dragStart.crop.left + dragStart.crop.width - 5;
-    }
-    if (dragType.includes('n') && newCrop.top > dragStart.crop.top + dragStart.crop.height - 5) {
-      newCrop.top = dragStart.crop.top + dragStart.crop.height - 5;
-    }
-
-    setCrop(newCrop);
-  }, [isDragging, dragStart, dragType]);
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-    setDragType(null);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      return () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-      };
-    }
-  }, [isDragging, handlePointerMove, handlePointerUp]);
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl flex flex-col w-full max-w-3xl overflow-hidden shadow-2xl">
-        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-          <h3 className="font-semibold text-lg text-gray-800">Crop Image</h3>
-          <div className="flex gap-2">
-            <button onClick={onCancel} className="px-4 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors">Cancel</button>
-            <button onClick={() => onDone(crop)} className="px-4 py-1.5 bg-[#4D47FF] text-white text-sm font-medium rounded-lg hover:bg-[#3b35db] transition-colors">Done</button>
-          </div>
-        </div>
-        <div className="p-8 flex-1 overflow-auto flex items-center justify-center bg-gray-100 min-h-[400px] max-h-[70vh]">
-          <div ref={containerRef} className="relative inline-block select-none shadow-lg max-h-[60vh]">
-            <img src={src} alt="To crop" className="max-h-[60vh] max-w-full block opacity-40 pointer-events-none" draggable={false} />
-            <img src={src} className="absolute inset-0 max-h-[60vh] max-w-full block pointer-events-none" style={{
-              clipPath: `inset(${crop.top}% ${100 - crop.left - crop.width}% ${100 - crop.top - crop.height}% ${crop.left}%)`
-            }} draggable={false} />
-            <div
-              className="absolute border border-white/80 cursor-move shadow-[0_0_10px_rgba(0,0,0,0.3)]"
-              style={{
-                left: `${crop.left}%`,
-                top: `${crop.top}%`,
-                width: `${crop.width}%`,
-                height: `${crop.height}%`,
-              }}
-              onPointerDown={(e) => handlePointerDown(e, 'move')}
-            >
-              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 border border-white/30 pointer-events-none">
-                <div className="border-r border-b border-white/30"></div>
-                <div className="border-r border-b border-white/30"></div>
-                <div className="border-b border-white/30"></div>
-                <div className="border-r border-b border-white/30"></div>
-                <div className="border-r border-b border-white/30"></div>
-                <div className="border-b border-white/30"></div>
-                <div className="border-r border-white/30"></div>
-                <div className="border-r border-white/30"></div>
-                <div></div>
-              </div>
-              <div className="absolute -left-1.5 -top-1.5 w-3 h-3 bg-[#4D47FF] border-[1.5px] border-white rounded-full cursor-nwse-resize" onPointerDown={(e) => handlePointerDown(e, 'nw')} />
-              <div className="absolute left-1.5 right-1.5 -top-1.5 h-3 cursor-ns-resize" onPointerDown={(e) => handlePointerDown(e, 'n')} />
-              <div className="absolute -right-1.5 -top-1.5 w-3 h-3 bg-[#4D47FF] border-[1.5px] border-white rounded-full cursor-nesw-resize" onPointerDown={(e) => handlePointerDown(e, 'ne')} />
-              <div className="absolute top-1.5 bottom-1.5 -right-1.5 w-3 cursor-ew-resize" onPointerDown={(e) => handlePointerDown(e, 'e')} />
-              <div className="absolute -right-1.5 -bottom-1.5 w-3 h-3 bg-[#4D47FF] border-[1.5px] border-white rounded-full cursor-nwse-resize" onPointerDown={(e) => handlePointerDown(e, 'se')} />
-              <div className="absolute left-1.5 right-1.5 -bottom-1.5 h-3 cursor-ns-resize" onPointerDown={(e) => handlePointerDown(e, 's')} />
-              <div className="absolute -left-1.5 -bottom-1.5 w-3 h-3 bg-[#4D47FF] border-[1.5px] border-white rounded-full cursor-nesw-resize" onPointerDown={(e) => handlePointerDown(e, 'sw')} />
-              <div className="absolute top-1.5 bottom-1.5 -left-1.5 w-3 cursor-ew-resize" onPointerDown={(e) => handlePointerDown(e, 'w')} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-const syncGradient = (doc, element, baseAttr) => {
-  const type = element.getAttribute(`${baseAttr}-type`);
-  const currentValue = element.getAttribute(baseAttr);
-  const isUrl = currentValue && currentValue.toLowerCase().startsWith('url(#');
-  const gradType = element.getAttribute(`${baseAttr}-gradient-type`) || 'linear';
-  const stopsJson = element.getAttribute(`${baseAttr}-stops`);
-
-  if (type === 'solid' || type === 'none') return;
-
-  if (isUrl && !stopsJson) {
-    if (element.tagName.toLowerCase() === 'g' || element.tagName.toLowerCase() === 'text') {
-      Array.from(element.querySelectorAll('tspan, path, rect, circle, ellipse, polygon, polyline')).forEach(child => {
-        child.setAttribute(baseAttr, currentValue);
-        if (child.style) child.style.setProperty(baseAttr, currentValue, 'important');
-      });
-    }
-    return;
-  }
-
-  if (!type && !isUrl) return;
-  if (!stopsJson) return;
-
-  let stops = [];
-  try { stops = JSON.parse(stopsJson); } catch (e) { return; }
-  if (!stops || !Array.isArray(stops)) return;
-
-  const svgRoot = element.closest('svg') || doc.querySelector('svg') || (doc.tagName?.toLowerCase() === 'svg' ? doc : null);
-  if (!svgRoot) return;
-
-  const ownerDoc = doc.ownerDocument || doc;
-
-  let defs = svgRoot.querySelector('defs');
-  if (!defs) {
-    defs = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "defs");
-    svgRoot.insertBefore(defs, svgRoot.firstChild);
-  }
-
-  if (!element.id) {
-    element.id = `${element.tagName}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  const gradIdPrefix = `grad-${element.id}-${baseAttr}`;
-  Array.from(defs.querySelectorAll(`[id^="${gradIdPrefix}"]`)).forEach(oldGrad => oldGrad.remove());
-
-  const gradId = `${gradIdPrefix}-${Math.random().toString(36).substr(2, 4)}`;
-  let gradEl = null;
-
-  const svgGradType = (gradType === 'angular' || gradType === 'diamond') ? (gradType === 'angular' ? 'linear' : 'radial') : gradType;
-
-  if (!gradEl) {
-    gradEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", `${svgGradType}Gradient`);
-    gradEl.id = gradId;
-    if (svgGradType === 'linear') {
-      const angle = parseFloat(element.getAttribute(`${baseAttr}-angle`) || '0');
-      const angleRad = (angle * Math.PI) / 180;
-      gradEl.setAttribute('x1', Math.round(50 - Math.cos(angleRad) * 50) + '%');
-      gradEl.setAttribute('y1', Math.round(50 - Math.sin(angleRad) * 50) + '%');
-      gradEl.setAttribute('x2', Math.round(50 + Math.cos(angleRad) * 50) + '%');
-      gradEl.setAttribute('y2', Math.round(50 + Math.sin(angleRad) * 50) + '%');
-    } else {
-      const radius = parseFloat(element.getAttribute(`${baseAttr}-radius`) || '50');
-      gradEl.setAttribute('cx', '50%');
-      gradEl.setAttribute('cy', '50%');
-      gradEl.setAttribute('r', radius + '%');
-    }
-    defs.appendChild(gradEl);
-  }
-
-  while (gradEl.firstChild) gradEl.removeChild(gradEl.firstChild);
-  stops.forEach(s => {
-    const stop = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "stop");
-    stop.setAttribute('offset', `${s.offset}%`);
-    stop.setAttribute('stop-color', s.color);
-    stop.setAttribute('stop-opacity', (s.opacity !== undefined && s.opacity !== null) ? s.opacity : 1);
-    gradEl.appendChild(stop);
-  });
-
-  const finalUrl = `url(#${gradId})`;
-  element.setAttribute(baseAttr, finalUrl);
-  if (element.style) {
-    element.style.setProperty(baseAttr, finalUrl, 'important');
-  }
-
-  if (element.tagName.toLowerCase() === 'g' || element.tagName.toLowerCase() === 'text') {
-    Array.from(element.querySelectorAll('tspan, path, rect, circle, ellipse, polygon, polyline')).forEach(child => {
-      child.setAttribute(baseAttr, finalUrl);
-      if (child.style) child.style.setProperty(baseAttr, finalUrl, 'important');
-    });
-  }
-};
 
 const ImageEditor = ({
   selectedElement,
@@ -281,71 +71,7 @@ const ImageEditor = ({
   currentPageVId
 }) => {
   const fileInputRef = useRef(null);
-  const getSvgImageEl = useCallback((el) => {
-    if (!el) return null;
-    const tag = el.tagName?.toLowerCase();
 
-    // 1. Check if the element itself is an image
-    if (tag === 'image' || tag === 'img') return el;
-
-    const resolveUse = (node) => {
-      const useEl = node.tagName?.toLowerCase() === 'use' ? node : node.querySelector('use');
-      if (useEl) {
-        const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
-        if (refId) {
-          const doc = useEl.ownerDocument;
-          const ownerSvg = useEl.closest('svg');
-          const refEl = doc?.getElementById(refId) || ownerSvg?.querySelector(`[id="${refId}"]`);
-          if (refEl && (refEl.tagName?.toLowerCase() === 'image' || refEl.tagName?.toLowerCase() === 'img')) {
-            return refEl;
-          }
-        }
-      }
-      return null;
-    };
-
-    const useTarget = resolveUse(el);
-    if (useTarget) return useTarget;
-
-    // 2. Helper to find image inside a pattern fill
-    const findInPattern = (node) => {
-      const fill = node.getAttribute?.('fill') || '';
-      if (fill?.startsWith('url(#')) {
-        const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
-        if (patternId) {
-          const doc = node.ownerDocument;
-          // Try finding within its own SVG root first (best for templates)
-          const ownerSvg = node.closest('svg');
-          const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`) || doc?.getElementById(patternId);
-
-          if (pattern) {
-            // SVG patterns might have an <image> directly or a <use> pointing to one
-            const img = pattern.querySelector('image');
-            if (img) return img;
-            return resolveUse(pattern);
-          }
-        }
-      }
-      return null;
-    };
-
-    // 3. Check for pattern on the element itself
-    const patternTarget = findInPattern(el);
-    if (patternTarget) return patternTarget;
-
-    // 4. Search within children (if it's a group)
-    const childImg = el.querySelector('image, img');
-    if (childImg) return childImg;
-
-    // 5. Check children for patterns
-    const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
-    for (const child of Array.from(childrenWithPatterns)) {
-      const target = findInPattern(child);
-      if (target) return target;
-    }
-
-    return null;
-  }, []);;
 
   const stateRef = useRef({
     imageType: 'Fit',
@@ -388,8 +114,7 @@ const ImageEditor = ({
   const [effectSettings, setEffectSettings] = useState({
     'Drop Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
     'Inner Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
-    'Blur': { blur: 1, spread: 0 },
-    'Background Blur': { blur: 1, spread: 0 }
+    'Blur': { blur: 1, spread: 0 }
   });
 
   const [activeColorPicker, setActiveColorPicker] = useState(null); // 'fill' | 'stroke' | null
@@ -426,6 +151,10 @@ const ImageEditor = ({
   const [openContextMenu, setOpenContextMenu] = useState(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [isStrokeStyleOpen, setIsStrokeStyleOpen] = useState(false);
+  const [showStrokeSettings, setShowStrokeSettings] = useState(false);
+  const [strokeSettingsPos, setStrokeSettingsPos] = useState({ top: 0, right: 0 });
+  const [isDashPosOpen, setIsDashPosOpen] = useState(false);
+  const [colorsOnPage, setColorsOnPage] = useState([]);
 
   // Memoize static gallery previews
   const galleryPreviews = useMemo(
@@ -715,8 +444,6 @@ const ImageEditor = ({
       const shadowStr = selectedElement.style.boxShadow || (overlay ? overlay.style.boxShadow : '') || '';
 
       if (/blur\(\d+px\)/.test(filterStr)) newEffects.push('Blur');
-      if (filterStr.includes('drop-shadow') || (selectedElement.parentElement?.style.filter || '').includes('drop-shadow')) newEffects.push('Drop Shadow');
-      if (backdropStr.includes('blur')) newEffects.push('Background Blur');
       if (shadowStr.includes('inset') || shadowStr.includes('drop-shadow')) newEffects.push('Inner Shadow');
     }
 
@@ -1603,29 +1330,13 @@ const ImageEditor = ({
           }
         }
       } else {
-        // --- HTML: Background Blur ---
-        if (activeEffects.includes('Background Blur')) {
-          const s = effectSettings['Background Blur'];
-          const blurVal = `blur(${s.blur}px)`;
-          liveElement.style.setProperty('backdrop-filter', blurVal, 'important');
-          liveElement.style.setProperty('-webkit-backdrop-filter', blurVal, 'important');
-          if (liveElement.src) {
-            liveElement.style.setProperty('mask-image', `url(${liveElement.src})`, 'important');
-            liveElement.style.setProperty('-webkit-mask-image', `url(${liveElement.src})`, 'important');
-            liveElement.style.setProperty('mask-repeat', 'no-repeat', 'important');
-            liveElement.style.setProperty('-webkit-mask-repeat', 'no-repeat', 'important');
-            const fitMap = { 'Fit': 'contain', 'Fill': 'cover', 'Crop': 'cover', 'Stretch': 'fill' };
-            liveElement.style.setProperty('mask-size', fitMap[imageType] || 'fill', 'important');
-            liveElement.style.setProperty('-webkit-mask-size', fitMap[imageType] || 'fill', 'important');
-            liveElement.style.setProperty('mask-position', 'center', 'important');
-            liveElement.style.setProperty('-webkit-mask-position', 'center', 'important');
-          }
-        } else {
-          liveElement.style.setProperty('backdrop-filter', 'none', 'important');
-          liveElement.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
-          liveElement.style.setProperty('mask-image', 'none', 'important');
-          liveElement.style.setProperty('-webkit-mask-image', 'none', 'important');
-        }        // --- HTML & <svg> wrapper: Object Fit Fallback ---
+        // --- HTML: Background Blur Removed ---
+        // (Cleaned up from removal)
+        liveElement.style.setProperty('backdrop-filter', 'none', 'important');
+        liveElement.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+        liveElement.style.setProperty('mask-image', 'none', 'important');
+        liveElement.style.setProperty('-webkit-mask-image', 'none', 'important');
+
         // (We removed the duplicate crop block that was conflicting with the actual crop logic above)
         const fitMap = { 'Fit': 'contain', 'Fill': 'cover', 'Crop': 'cover', 'Stretch': 'fill' };
         if (effectiveImageType !== 'Crop') {
@@ -2898,30 +2609,56 @@ const ImageEditor = ({
           )}
 
           {/* ── Color / Adjustments / Corner Radius / Effect ── always shown in both modes ── */}
-          <SubComponent
+          <Color
             openSubSection={openSubSection}
             setOpenSubSection={setOpenSubSection}
             backgroundColor={backgroundColor}
             setBackgroundColor={setBackgroundColor}
             activeColorPicker={activeColorPicker}
             setActiveColorPicker={setActiveColorPicker}
+            showStrokeSettings={showStrokeSettings}
+            setShowStrokeSettings={setShowStrokeSettings}
             isStrokeStyleOpen={isStrokeStyleOpen}
             setIsStrokeStyleOpen={setIsStrokeStyleOpen}
             dropdownPos={dropdownPos}
             setDropdownPos={setDropdownPos}
-            filters={filters}
-            setFilters={setFilters}
+            strokeSettingsPos={strokeSettingsPos}
+            setStrokeSettingsPos={setStrokeSettingsPos}
+            isDashPosOpen={isDashPosOpen}
+            setIsDashPosOpen={setIsDashPosOpen}
+            activePopup={activePopup}
+            setActivePopup={setActivePopup}
+            colorsOnPage={colorsOnPage}
+            showDetailedPicker={showDetailedPicker}
+            setShowDetailedPicker={setShowDetailedPicker}
+          />
+          <CornerRadius
+            openSubSection={openSubSection}
+            setOpenSubSection={setOpenSubSection}
             radius={radius}
             setRadius={setRadius}
             isRadiusLinked={isRadiusLinked}
             setIsRadiusLinked={setIsRadiusLinked}
+            tagName={selectedElement?.tagName?.toLowerCase() || 'image'}
+          />
+          <Adjustment
+            openSubSection={openSubSection}
+            setOpenSubSection={setOpenSubSection}
+            filters={filters}
+            setFilters={setFilters}
+            tagName={selectedElement?.tagName?.toLowerCase() || 'image'}
+          />
+          <Effect
+            openSubSection={openSubSection}
+            setOpenSubSection={setOpenSubSection}
             activeEffects={activeEffects}
             setActiveEffects={setActiveEffects}
-            activePopup={activePopup}
-            setActivePopup={setActivePopup}
             effectSettings={effectSettings}
             setEffectSettings={setEffectSettings}
-            handleColorPick={handleColorPick}
+            activeColorPicker={activeColorPicker}
+            setActiveColorPicker={setActiveColorPicker}
+            showDetailedPicker={showDetailedPicker}
+            setShowDetailedPicker={setShowDetailedPicker}
           />
 
           {showGallery && (

@@ -40,7 +40,10 @@ import {
 import GalleryGif from "./GalleryGif";
 import ColorPicker, { parseGradient } from './ColorPicker';
 import { Icon } from '@iconify/react';
-import SubComponent from './SubComponent';
+import Color from './Color';
+import CornerRadius from './CornerRadius';
+import Adjustment from './Adjustment';
+import Effect from './Effect';
 
 const galleryPreviewImages = [
   "https://media.giphy.com/media/3o7aD2saalEvTe2v0c/giphy.gif",
@@ -90,8 +93,7 @@ const GifEditor = ({
   const [effectSettings, setEffectSettings] = useState({
     'Drop Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
     'Inner Shadow': { color: '#000000', opacity: 35, x: 4, y: 4, blur: 1, spread: 0 },
-    'Blur': { blur: 1, spread: 0 },
-    'Background Blur': { blur: 1, spread: 0 }
+    'Blur': { blur: 1, spread: 0 }
   });
 
   const [backgroundColor, setBackgroundColor] = useState({
@@ -1292,21 +1294,11 @@ const GifEditor = ({
           </div>
         </div>
 
-        <SubComponent
+        <Color
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}
           backgroundColor={backgroundColor}
           setBackgroundColor={setBackgroundColor}
-          filters={filters}
-          setFilters={setFilters}
-          radius={radius}
-          setRadius={setRadius}
-          isRadiusLinked={isRadiusLinked}
-          setIsRadiusLinked={setIsRadiusLinked}
-          activeEffects={activeEffects}
-          setActiveEffects={setActiveEffects}
-          effectSettings={effectSettings}
-          setEffectSettings={setEffectSettings}
           activeColorPicker={activeColorPicker}
           setActiveColorPicker={setActiveColorPicker}
           showStrokeSettings={showStrokeSettings}
@@ -1322,6 +1314,34 @@ const GifEditor = ({
           activePopup={activePopup}
           setActivePopup={setActivePopup}
           colorsOnPage={colorsOnPage}
+          showDetailedPicker={showDetailedPicker}
+          setShowDetailedPicker={setShowDetailedPicker}
+        />
+        <CornerRadius
+          openSubSection={openSubSection}
+          setOpenSubSection={setOpenSubSection}
+          radius={radius}
+          setRadius={setRadius}
+          isRadiusLinked={isRadiusLinked}
+          setIsRadiusLinked={setIsRadiusLinked}
+          tagName={selectedElement?.tagName?.toLowerCase() || 'image'}
+        />
+        <Adjustment
+          openSubSection={openSubSection}
+          setOpenSubSection={setOpenSubSection}
+          filters={filters}
+          setFilters={setFilters}
+          tagName={selectedElement?.tagName?.toLowerCase() || 'image'}
+        />
+        <Effect
+          openSubSection={openSubSection}
+          setOpenSubSection={setOpenSubSection}
+          activeEffects={activeEffects}
+          setActiveEffects={setActiveEffects}
+          effectSettings={effectSettings}
+          setEffectSettings={setEffectSettings}
+          activeColorPicker={activeColorPicker}
+          setActiveColorPicker={setActiveColorPicker}
           showDetailedPicker={showDetailedPicker}
           setShowDetailedPicker={setShowDetailedPicker}
         />

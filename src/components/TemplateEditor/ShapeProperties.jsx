@@ -792,8 +792,7 @@ const ShapeProperties = ({
               {[
                 { id: 'drop-shadow', label: 'Drop Shadow' },
                 { id: 'inner-shadow', label: 'Inner Shadow' },
-                { id: 'blur', label: 'Blur' },
-                { id: 'background-blur', label: 'Background Blur' }
+                { id: 'blur', label: 'Blur' }
               ].map(effect => {
                 const isActive = selectedElementProps[`data-effect-${effect.id}`] === 'true';
                 return (
@@ -848,8 +847,7 @@ const ShapeProperties = ({
                 {{
                   'drop-shadow': 'Drop Shadow',
                   'inner-shadow': 'Inner Shadow',
-                  'blur': 'Blur',
-                  'background-blur': 'Background Blur'
+                  'blur': 'Blur'
                 }[activeEffectPopupId]}
               </span>
               <div className="h-px flex-grow bg-gray-200"></div>
@@ -1003,7 +1001,7 @@ const ShapeProperties = ({
 
             {/* Blur Only Style (Simplified) */}
             {/* Blur Style (Matches User Image) */}
-            {(activeEffectPopupId === 'blur' || activeEffectPopupId === 'background-blur') && (
+            {activeEffectPopupId === 'blur' && (
               <div className="space-y-[0.8vw] pt-[0.2vw]">
                 {[
                   { id: 'value', label: 'Blur % :', default: 1 },
